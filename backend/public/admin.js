@@ -1160,6 +1160,117 @@ async function loadSentimentCharts() {
 }
 
 /**
+ * Create a chart for a specific multiple choice question
+ * @param {Object} question - The question object
+ * @param {HTMLCanvasElement} canvas - The canvas element to draw the chart on
+ */
+function createQuestionChart(question, canvas) {
+  try {
+    // Count responses for each option
+    const optionCounts = {};
+    
+    // Ensure options is an array
+    const options = Array.isArray(question.options) ? question.options : [];
+    
+    options.forEach(option => {
+      optionCounts[option] = 0;
+    });
+    
+    // Ensure allResponses is an array
+    const responses = Array.isArray(STATE.allResponses) ? STATE.allResponses : [];
+    
+    // Count the responses
+    responses.forEach(response => {
+      if (response && response.questionId === question._id && response.selectedOption) {
+        if (optionCounts[response.selectedOption] !== undefined) {
+          optionCounts[response.selectedOption]++;
+        }
+      }
+    });
+    
+    console.log(`Counts for question ${question.text}:`, optionCounts);
+    
+    // Prepare data for the chart
+    const ctx = canvas.getContext('2d');
+    const padding = 40;
+    const chartWidth = canvas.width - padding * 2;
+    const chartHeight = canvas.height - padding * 2;
+    
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw axes
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, canvas.height - padding);
+    ctx.lineTo(canvas.width - padding, canvas.height - padding);
+    ctx.stroke();
+    
+    // Get options and counts
+    const optionLabels = Object.keys(optionCounts);
+    const counts = Object.values(optionCounts);
+    const maxCount = Math.max(...counts, 1); // Ensure we don't divide by zero
+    
+    // Draw bars
+    const barWidth = chartWidth / optionLabels.length;
+    
+    optionLabels.forEach((option, index) => {
+      const count = optionCounts[option];
+      const barHeight = (count / maxCount) * chartHeight;
+      const x = padding + index * barWidth;
+      const y = canvas.height - padding - barHeight;
+      
+      // Draw bar with different colors
+      const colors = ['#4CAF50', '#2196F3', '#FF5722'];
+      ctx.fillStyle = colors[index % colors.length];
+      ctx.fillRect(x, y, barWidth - 10, barHeight);
+      
+      // Draw option label
+      ctx.fillStyle = '#000';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      
+      // Truncate long option text
+      let displayOption = option;
+      if (displayOption.length > 15) {
+        displayOption = displayOption.substring(0, 12) + '...';
+      }
+      
+      ctx.fillText(displayOption, x + barWidth / 2, canvas.height - padding + 15);
+      
+      // Draw count on top of bar
+      ctx.fillText(count, x + barWidth / 2, y - 5);
+    });
+    
+    // Draw y-axis labels
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'right';
+    
+    // Calculate appropriate y-axis intervals
+    const yAxisSteps = 5;
+    for (let i = 0; i <= yAxisSteps; i++) {
+      const value = Math.round((i / yAxisSteps) * maxCount);
+      const y = canvas.height - padding - (i / yAxisSteps) * chartHeight;
+      ctx.fillText(value, padding - 5, y + 3);
+    }
+    
+    // Add title
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText('Response Distribution', canvas.width / 2, 20);
+  } catch (error) {
+    console.error('Error in createQuestionChart:', error);
+    // Draw error message on canvas
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#FF0000';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Error rendering chart', canvas.width / 2, canvas.height / 2);
+  }
+}
+
+/**
  * Create a sentiment chart for a text question
  * @param {Object} question - The question object
  * @param {Array} sentiments - Array of sentiment analysis results
@@ -1246,7 +1357,6 @@ function createSentimentChart(question, sentiments, canvas) {
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px Arial';
     ctx.fillText('Sentiment Distribution', canvas.width / 2, 20);
-    
   } catch (error) {
     console.error('Error in createSentimentChart:', error);
     // Draw error message on canvas
