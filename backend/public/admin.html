@@ -185,39 +185,10 @@
       
       <!-- Analytics Tab -->
       <div class="tab-content" id="analytics-tab">
-        <h2>Pareto Analysis</h2>
-        <p>Analyze frequency of keywords in all responses</p>
+        <h2>Question Analytics</h2>
+        <p>View response distribution for multiple choice questions</p>
         
-        <div class="form-group">
-          <input type="text" id="new-keyword" placeholder="Add new keyword..." />
-          <button id="add-keyword">Add Keyword</button>
-        </div>
-        
-        <div id="keywords-list" class="keyword-container">
-          <!-- Default keywords -->
-          <div class="keyword-badge" data-keyword="good">
-            good <button class="remove-keyword">×</button>
-          </div>
-          <div class="keyword-badge" data-keyword="bad">
-            bad <button class="remove-keyword">×</button>
-          </div>
-          <div class="keyword-badge" data-keyword="improve">
-            improve <button class="remove-keyword">×</button>
-          </div>
-          <div class="keyword-badge" data-keyword="issue">
-            issue <button class="remove-keyword">×</button>
-          </div>
-          <div class="keyword-badge" data-keyword="problem">
-            problem <button class="remove-keyword">×</button>
-          </div>
-        </div>
-        
-        <div id="keyword-analysis">
-          <h3>Pareto Chart</h3>
-          <div id="chart-container" class="chart-container">
-            <canvas id="pareto-chart"></canvas>
-          </div>
-        </div>
+        <!-- Question charts will be dynamically added here -->
       </div>
     </main>
   </div>

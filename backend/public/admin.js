@@ -44,10 +44,7 @@ const DOM = {
   userResponses: document.getElementById('user-responses'),
   
   // Analytics elements
-  newKeyword: document.getElementById('new-keyword'),
-  addKeywordBtn: document.getElementById('add-keyword'),
-  keywordsList: document.getElementById('keywords-list'),
-  chartContainer: document.getElementById('chart-container')
+  chartsContainer: document.getElementById('charts-container')
 };
 
 /**
@@ -135,7 +132,6 @@ function setupEventListeners() {
       } else if (tabName === 'responses') {
         loadUsers();
       } else if (tabName === 'analytics') {
-        analyzeKeywords();
         loadQuestionCharts();
       }
     });
@@ -148,33 +144,6 @@ function setupEventListeners() {
   
   // Question form submission
   DOM.questionForm.addEventListener('submit', handleQuestionFormSubmit);
-  
-  // Add keyword button
-  DOM.addKeywordBtn.addEventListener('click', () => {
-    const keyword = DOM.newKeyword.value.trim().toLowerCase();
-    if (keyword) {
-      addKeyword(keyword);
-      DOM.newKeyword.value = '';
-      analyzeKeywords();
-    }
-  });
-  
-  // Enter key for adding keywords
-  DOM.newKeyword.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      DOM.addKeywordBtn.click();
-    }
-  });
-  
-  // Remove keyword buttons (delegated event)
-  document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('remove-keyword')) {
-      const keywordBadge = e.target.closest('.keyword-badge');
-      const keyword = keywordBadge.dataset.keyword;
-      removeKeyword(keyword);
-    }
-  });
 }
 
 /**
@@ -232,17 +201,7 @@ function updateLanguage() {
   
   // Update analytics tab
   document.querySelector('#analytics-tab h2').textContent = 
-    translations[STATE.currentLanguage].paretoAnalysis;
-  document.querySelector('#analytics-tab > p').textContent = 
-    translations[STATE.currentLanguage].analyzeKeywords;
-  
-  DOM.newKeyword.placeholder = 
-    translations[STATE.currentLanguage].newKeyword;
-  DOM.addKeywordBtn.textContent = 
-    translations[STATE.currentLanguage].addKeyword;
-  
-  document.querySelector('#keyword-analysis h3').textContent = 
-    translations[STATE.currentLanguage].paretoChart;
+    translations[STATE.currentLanguage].questionCharts;
   
   // Reload data for the active tab
   const activeTab = document.querySelector('.tab.active').dataset.tab;
@@ -251,7 +210,7 @@ function updateLanguage() {
   } else if (activeTab === 'responses') {
     loadUsers();
   } else if (activeTab === 'analytics') {
-    analyzeKeywords();
+    loadQuestionCharts();
   }
 }
 
@@ -727,237 +686,9 @@ async function loadAllResponses() {
     }
     
     STATE.allResponses = await response.json();
-    analyzeKeywords();
   } catch (error) {
     showError(`Error loading responses for analytics: ${error.message}`);
   }
-}
-
-/**
- * Render Pareto chart from keyword data
- * @param {Array} keywordData - Array of keyword data objects
- */
-function renderParetoChart(keywordData) {
-  if (!keywordData || keywordData.length === 0) {
-    DOM.chartContainer.innerHTML = '<p class="no-data">No data available for analysis</p>';
-    return;
-  }
-  
-  // Display the Pareto chart
-  displayParetoChart(keywordData);
-}
-
-/**
- * Add a keyword to the list
- * @param {string} keyword - Keyword to add
- */
-function addKeyword(keyword) {
-  // Check if keyword already exists
-  const existingKeyword = document.querySelector(`.keyword-badge[data-keyword="${keyword}"]`);
-  if (existingKeyword) {
-    return;
-  }
-  
-  const keywordBadge = document.createElement('div');
-  keywordBadge.className = 'keyword-badge';
-  keywordBadge.dataset.keyword = keyword;
-  keywordBadge.textContent = keyword + ' ';
-  
-  const removeBtn = document.createElement('button');
-  removeBtn.className = 'remove-keyword';
-  removeBtn.textContent = '×';
-  
-  keywordBadge.appendChild(removeBtn);
-  DOM.keywordsList.appendChild(keywordBadge);
-}
-
-/**
- * Remove a keyword from the list
- * @param {string} keyword - Keyword to remove
- */
-function removeKeyword(keyword) {
-  const keywordBadge = document.querySelector(`.keyword-badge[data-keyword="${keyword}"]`);
-  if (keywordBadge) {
-    keywordBadge.remove();
-    analyzeKeywords();
-  }
-}
-
-/**
- * Analyze keywords in responses
- */
-function analyzeKeywords() {
-  if (!STATE.allResponses.length) return;
-  
-  const keywords = Array.from(DOM.keywordsList.querySelectorAll('.keyword-badge')).map(
-    badge => badge.getAttribute('data-keyword')
-  );
-  
-  const keywordCounts = {};
-  keywords.forEach(keyword => {
-    keywordCounts[keyword] = 0;
-  });
-  
-  // Count occurrences
-  STATE.allResponses.forEach(response => {
-    const text = (response.responseText || response.selectedOption || '').toLowerCase();
-    keywords.forEach(keyword => {
-      if (text.includes(keyword)) {
-        keywordCounts[keyword]++;
-      }
-    });
-  });
-  
-  // Sort by count
-  const sortedKeywords = Object.keys(keywordCounts).sort((a, b) => keywordCounts[b] - keywordCounts[a]);
-  
-  // Calculate total and cumulative percentages
-  const total = Object.values(keywordCounts).reduce((sum, count) => sum + count, 0);
-  let cumulative = 0;
-  const chartData = sortedKeywords.map(keyword => {
-    const count = keywordCounts[keyword];
-    const percentage = total > 0 ? (count / total) * 100 : 0;
-    cumulative += percentage;
-    return {
-      keyword,
-      count,
-      percentage,
-      cumulative
-    };
-  });
-  
-  // Display chart
-  displayParetoChart(chartData);
-}
-
-/**
- * Display Pareto chart
- * @param {Array} data - Chart data
- */
-function displayParetoChart(data) {
-  if (!data || data.length === 0) {
-    DOM.chartContainer.innerHTML = '<p class="no-data">No data available for analysis</p>';
-    return;
-  }
-  
-  // Clear and style the container
-  DOM.chartContainer.innerHTML = '';
-  DOM.chartContainer.style.overflow = 'hidden'; // Prevent overflow
-  DOM.chartContainer.style.position = 'relative'; // For proper sizing
-  DOM.chartContainer.style.maxWidth = '100%'; // Ensure container doesn't overflow
-  DOM.chartContainer.style.margin = '0 auto'; // Center the chart
-  
-  if (data.length === 0) {
-    DOM.chartContainer.textContent = translations[STATE.currentLanguage].noData || 'No data available';
-    return;
-  }
-  
-  // Create chart elements
-  const canvas = document.createElement('canvas');
-  canvas.id = 'pareto-chart';
-  
-  // Make sure the canvas fits within its container
-  const containerWidth = DOM.chartContainer.clientWidth;
-  canvas.width = Math.min(containerWidth - 20, 700); // Cap width with some margin
-  canvas.height = 300; // Further reduced height
-  canvas.style.maxWidth = '100%'; // Ensure it never exceeds container
-  canvas.style.height = 'auto'; // Maintain aspect ratio
-  canvas.style.display = 'block'; // Remove inline spacing
-  
-  DOM.chartContainer.appendChild(canvas);
-  
-  const ctx = canvas.getContext('2d');
-  const padding = 50; // Increased padding for better spacing
-  const chartWidth = canvas.width - padding * 2;
-  const chartHeight = canvas.height - padding * 2;
-  
-  // Clear the entire canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // Draw axes
-  ctx.beginPath();
-  ctx.moveTo(padding, padding);
-  ctx.lineTo(padding, canvas.height - padding);
-  ctx.lineTo(canvas.width - padding, canvas.height - padding);
-  ctx.stroke();
-  
-  // Limit number of items to display if there are too many
-  const displayData = data.length > 8 ? data.slice(0, 8) : data; // Reduced to 8 items max
-  
-  // Draw bars and line
-  const barWidth = chartWidth / displayData.length;
-  const maxCount = Math.max(...displayData.map(item => item.count));
-  
-  // Draw bars
-  displayData.forEach((item, index) => {
-    const barHeight = (item.count / maxCount) * chartHeight;
-    const x = padding + index * barWidth;
-    const y = canvas.height - padding - barHeight;
-    
-    ctx.fillStyle = '#4CAF50';
-    ctx.fillRect(x, y, barWidth - 5, barHeight);
-    
-    // Draw keyword label - handle long keywords
-    ctx.fillStyle = '#000';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'center';
-    
-    // Truncate long keywords
-    let displayKeyword = item.keyword;
-    if (displayKeyword.length > 10) {
-      displayKeyword = displayKeyword.substring(0, 8) + '...';
-    }
-    
-    // Rotate labels if there are many items
-    if (displayData.length > 5) {
-      ctx.save();
-      ctx.translate(x + barWidth / 2, canvas.height - padding + 5);
-      ctx.rotate(-Math.PI / 4);
-      ctx.textAlign = 'right';
-      ctx.fillText(displayKeyword, 0, 0);
-      ctx.restore();
-    } else {
-      ctx.fillText(displayKeyword, x + barWidth / 2, canvas.height - padding + 15);
-    }
-    
-    // Draw count label
-    ctx.fillText(item.count, x + barWidth / 2, y - 5);
-  });
-  
-  // Draw cumulative line
-  ctx.beginPath();
-  ctx.strokeStyle = '#FF5722';
-  ctx.lineWidth = 2;
-  
-  displayData.forEach((item, index) => {
-    const x = padding + index * barWidth + barWidth / 2;
-    const y = canvas.height - padding - (item.cumulative / 100) * chartHeight;
-    
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  
-  ctx.stroke();
-  
-  // Draw y-axis labels
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'right';
-  for (let i = 0; i <= 10; i++) {
-    const y = canvas.height - padding - (i / 10) * chartHeight;
-    ctx.fillText(`${i * 10}%`, padding - 5, y + 3);
-  }
-  
-  // Add responsive behavior
-  window.addEventListener('resize', () => {
-    if (DOM.chartContainer.contains(canvas)) {
-      canvas.width = Math.min(DOM.chartContainer.clientWidth - 20, 700);
-      // Redraw chart when window is resized
-      displayParetoChart(data);
-    }
-  });
 }
 
 /**
@@ -977,8 +708,9 @@ async function loadQuestionCharts() {
       title.textContent = 'Multiple Choice Question Results';
       questionChartsContainer.appendChild(title);
       
-      // Add the container after the Pareto chart
-      DOM.chartContainer.parentNode.insertBefore(questionChartsContainer, DOM.chartContainer.nextSibling);
+      // Add the container to the analytics tab
+      const analyticsTab = document.getElementById('analytics-tab');
+      analyticsTab.appendChild(questionChartsContainer);
     } else {
       // Clear existing charts
       questionChartsContainer.innerHTML = '<h3>Multiple Choice Question Results</h3>';

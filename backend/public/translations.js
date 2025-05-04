@@ -43,11 +43,13 @@ const translations = {
     submitted: "Submitted",
     
     // Analytics Tab
-    paretoAnalysis: "Pareto Analysis",
-    analyzeKeywords: "Analyze frequency of keywords in all responses",
+    questionCharts: "Question Analytics",
+    questionAnalytics: "View response distribution for multiple choice questions",
+    responseDistribution: "Response Distribution",
     addKeyword: "Add Keyword",
     newKeyword: "Add new keyword...",
     paretoChart: "Pareto Chart",
+    noMultipleChoiceQuestions: "No multiple choice questions found.",
     
     // Confirmations
     deleteConfirm: "Are you sure you want to delete this question?",
@@ -103,11 +105,13 @@ const translations = {
     submitted: "Enviado",
     
     // Analytics Tab
-    paretoAnalysis: "Análisis de Pareto",
-    analyzeKeywords: "Analizar frecuencia de palabras clave en todas las respuestas",
+    questionCharts: "Análisis de Preguntas",
+    questionAnalytics: "Ver distribución de respuestas para preguntas de opción múltiple",
+    responseDistribution: "Distribución de Respuestas",
     addKeyword: "Agregar Palabra Clave",
     newKeyword: "Agregar nueva palabra clave...",
     paretoChart: "Gráfico de Pareto",
+    noMultipleChoiceQuestions: "No se encontraron preguntas de opción múltiple.",
     
     // Confirmations
     deleteConfirm: "¿Estás seguro de que deseas eliminar esta pregunta?",
