@@ -6,9 +6,9 @@ const responseController = require('../controllers/responseController');
 // Question Routes
 router.post('/questions', questionController.createQuestion);
 router.get('/questions', questionController.getQuestions);
+router.post('/questions/order', questionController.updateQuestionOrder);
 router.put('/questions/:id', questionController.updateQuestion);
 router.delete('/questions/:id', questionController.deleteQuestion);
-router.post('/questions/order', questionController.updateQuestionOrder);
 
 // Response Routes
 router.post('/responses', responseController.submitResponse);

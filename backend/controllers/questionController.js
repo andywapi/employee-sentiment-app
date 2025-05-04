@@ -191,32 +191,53 @@ exports.updateQuestion = async (req, res) => {
  */
 exports.updateQuestionOrder = async (req, res) => {
   try {
+    console.log('Received order update request:', req.body);
     const { questions } = req.body;
     
-    if (!questions || !Array.isArray(questions)) {
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      console.error('Invalid request format:', req.body);
       return res.status(400).json({
         success: false,
         message: 'Invalid request format. Expected an array of questions with id and order.'
       });
     }
     
-    // Process each question update in parallel
-    const updatePromises = questions.map(item => {
+    // Validate each question item
+    for (const item of questions) {
       if (!item.id || item.order === undefined) {
-        return Promise.reject(new Error('Each question must have an id and order'));
+        console.error('Invalid question item:', item);
+        return res.status(400).json({
+          success: false,
+          message: 'Each question must have an id and order'
+        });
       }
-      
-      return SurveyQuestion.findByIdAndUpdate(
+    }
+    
+    console.log('Processing update for', questions.length, 'questions');
+    
+    // Process each question update in sequence to avoid race conditions
+    for (const item of questions) {
+      const updatedQuestion = await SurveyQuestion.findByIdAndUpdate(
         item.id,
         { order: item.order },
         { new: true }
       );
-    });
-    
-    await Promise.all(updatePromises);
+      
+      if (!updatedQuestion) {
+        console.error('Question not found:', item.id);
+        return res.status(404).json({
+          success: false,
+          message: `Question with id ${item.id} not found`
+        });
+      }
+      
+      console.log('Updated question order:', updatedQuestion._id, 'to', updatedQuestion.order);
+    }
     
     // Fetch the updated questions with their new order
     const updatedQuestions = await SurveyQuestion.find().sort({ order: 1 });
+    
+    console.log('Order update complete. Returning', updatedQuestions.length, 'questions');
     
     res.json({
       success: true,
@@ -225,6 +246,14 @@ exports.updateQuestionOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating question order:', error.message);
+    
+    // Handle invalid ObjectId format
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid question ID format'
+      });
+    }
     
     res.status(500).json({
       success: false,

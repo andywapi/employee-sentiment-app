@@ -1595,16 +1595,27 @@ async function saveQuestionOrder() {
       };
     });
     
+    console.log('Saving question order:', questions);
+    
     // Send the updated order to the server
     const response = await fetch(`${API_CONFIG.BASE_URL}/questions/order`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      credentials: 'include',
       body: JSON.stringify({ questions })
     });
     
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Error response from server:', response.status, errorData);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    const result = await response.json();
+    console.log('Order update response:', result);
     
     // Exit reorder mode
     exitReorderMode();
@@ -1615,6 +1626,7 @@ async function saveQuestionOrder() {
     // Reload questions to show the new order
     loadQuestions();
   } catch (error) {
+    console.error('Error in saveQuestionOrder:', error);
     showError(`Error saving question order: ${error.message}`);
   }
 }
