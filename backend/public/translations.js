@@ -18,6 +18,12 @@ const translations = {
     statusMessage: "Frontend successfully loaded! If you see this message, the static file serving is working correctly.",
     adminPanel: "Admin Panel",
     userId: "User ID",
+    next: "Next",
+    previous: "Previous",
+    pleaseAnswer: "Please answer the question before proceeding.",
+    pleaseEnterResponse: "Please enter a response before proceeding.",
+    answerAllQuestions: "Please answer all questions before submitting.",
+    questionProgress: "Question {current} of {total}",
     
     // Admin Panel
     questionsTab: "Questions",
@@ -34,6 +40,11 @@ const translations = {
     option: "Option",
     existingQuestions: "Existing Questions",
     noQuestionsMessage: "No questions found. Create your first question above!",
+    reorderMode: "Reorder Questions",
+    saveOrder: "Save Order",
+    cancel: "Cancel",
+    reorderInstructions: "Drag and drop questions to reorder them, then click Save Order",
+    orderSaved: "Question order saved successfully",
     
     // Responses Tab
     userResponses: "User Responses",
@@ -70,8 +81,10 @@ const translations = {
     failedToSave: "Failed to save question",
     failedToDelete: "Failed to delete question",
     failedToSubmit: "Failed to submit responses",
+    failedToLoad: "Failed to load questions. Please try again.",
     multipleChoiceRequired: "Multiple choice questions must have at least one option",
-    noData: "No data to display"
+    noData: "No data to display",
+    userIdRequired: "User ID is required"
   },
   es: {
     // Common
@@ -91,6 +104,12 @@ const translations = {
     statusMessage: "¡Frontend cargado correctamente! Si ves este mensaje, el servidor está funcionando correctamente.",
     adminPanel: "Panel de Administración",
     userId: "ID de Usuario",
+    next: "Siguiente",
+    previous: "Anterior",
+    pleaseAnswer: "Por favor responda la pregunta antes de continuar.",
+    pleaseEnterResponse: "Por favor ingrese una respuesta antes de continuar.",
+    answerAllQuestions: "Por favor responda todas las preguntas antes de enviar.",
+    questionProgress: "Pregunta {current} de {total}",
     
     // Admin Panel
     questionsTab: "Preguntas",
@@ -107,6 +126,11 @@ const translations = {
     option: "Opción",
     existingQuestions: "Preguntas Existentes",
     noQuestionsMessage: "No se encontraron preguntas. ¡Crea tu primera pregunta arriba!",
+    reorderMode: "Reordenar Preguntas",
+    saveOrder: "Guardar Orden",
+    cancel: "Cancelar",
+    reorderInstructions: "Arrastra y suelta las preguntas para reordenarlas, luego haz clic en Guardar Orden",
+    orderSaved: "Orden de preguntas guardado exitosamente",
     
     // Responses Tab
     userResponses: "Respuestas de Usuarios",
@@ -143,7 +167,9 @@ const translations = {
     failedToSave: "Error al guardar la pregunta",
     failedToDelete: "Error al eliminar la pregunta",
     failedToSubmit: "Error al enviar las respuestas",
+    failedToLoad: "Error al cargar las preguntas. Por favor intente de nuevo.",
     multipleChoiceRequired: "Las preguntas de opción múltiple deben tener al menos una opción",
-    noData: "No hay datos para mostrar"
+    noData: "No hay datos para mostrar",
+    userIdRequired: "El ID de usuario es requerido"
   }
 };

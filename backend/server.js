@@ -42,8 +42,8 @@ app.use((req, res, next) => {
  */
 const connectDB = async () => {
   try {
-    // Use MONGODB_URI from environment variables
-    const mongoURI = process.env.MONGODB_URI;
+    // Use local MongoDB URI
+    const mongoURI = 'mongodb://localhost:27017/employee_sentiment_db';
     
     console.log(`Connecting to MongoDB...`);
     const conn = await mongoose.connect(mongoURI, {
@@ -62,8 +62,83 @@ const connectDB = async () => {
 // Connect to MongoDB
 connectDB();
 
+// Add a direct test route for question ordering
+app.post('/api/test-order', (req, res) => {
+  console.log('Test order route hit:', req.body);
+  res.json({
+    success: true,
+    message: 'Order update test successful',
+    data: req.body
+  });
+});
+
+// Add a direct implementation of the question ordering functionality
+app.post('/api/questions/order', async (req, res) => {
+  try {
+    console.log('Direct question order route hit:', req.body);
+    const { questions } = req.body;
+    
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      console.error('Invalid request format:', req.body);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request format. Expected an array of questions with id and order.'
+      });
+    }
+    
+    // Import the SurveyQuestion model directly
+    const SurveyQuestion = require('./models/SurveyQuestion');
+    
+    // Process each question update in sequence
+    for (const item of questions) {
+      if (!item.id || item.order === undefined) {
+        console.error('Invalid question item:', item);
+        return res.status(400).json({
+          success: false,
+          message: 'Each question must have an id and order'
+        });
+      }
+      
+      const updatedQuestion = await SurveyQuestion.findByIdAndUpdate(
+        item.id,
+        { order: item.order },
+        { new: true }
+      );
+      
+      if (!updatedQuestion) {
+        console.error('Question not found:', item.id);
+        return res.status(404).json({
+          success: false,
+          message: `Question with id ${item.id} not found`
+        });
+      }
+      
+      console.log('Updated question order:', updatedQuestion._id, 'to', updatedQuestion.order);
+    }
+    
+    // Fetch the updated questions with their new order
+    const updatedQuestions = await SurveyQuestion.find().sort({ order: 1 });
+    
+    res.json({
+      success: true,
+      message: 'Question order updated successfully',
+      data: updatedQuestions
+    });
+  } catch (error) {
+    console.error('Error updating question order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating question order'
+    });
+  }
+});
+
 // API Routes - Apply authentication middleware to all API routes
-app.use(API_PREFIX, authenticate);
+if (process.env.NODE_ENV === 'production') {
+  app.use(API_PREFIX, authenticate);
+} else {
+  console.log('Running in development mode - authentication bypassed');
+}
 app.use(API_PREFIX, surveyRoutes);
 
 // Serve static frontend

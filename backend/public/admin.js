@@ -7,7 +7,7 @@
 
 // API configuration
 const API_CONFIG = {
-  BASE_URL: window.location.origin + '/api'
+  BASE_URL: '/api'
 };
 
 // State management
@@ -49,7 +49,12 @@ const DOM = {
   chartsContainer: document.getElementById('charts-container'),
   
   // Weather display
-  weatherDisplay: document.getElementById('weather-display')
+  weatherDisplay: document.getElementById('weather-display'),
+  
+  // Question ordering
+  reorderModeBtn: document.getElementById('reorder-mode-btn'),
+  saveOrderBtn: document.getElementById('save-order-btn'),
+  cancelOrderBtn: document.getElementById('cancel-order-btn')
 };
 
 /**
@@ -164,6 +169,19 @@ function setupEventListeners() {
   
   // Question form submission
   DOM.questionForm.addEventListener('submit', handleQuestionFormSubmit);
+  
+  // Question reordering
+  if (DOM.reorderModeBtn) {
+    DOM.reorderModeBtn.addEventListener('click', enableReorderMode);
+  }
+  
+  if (DOM.saveOrderBtn) {
+    DOM.saveOrderBtn.addEventListener('click', saveQuestionOrder);
+  }
+  
+  if (DOM.cancelOrderBtn) {
+    DOM.cancelOrderBtn.addEventListener('click', cancelReorderMode);
+  }
 }
 
 /**
@@ -214,6 +232,19 @@ function updateLanguage() {
   
   document.querySelector('#questions-tab h2:last-of-type').textContent = 
     translations[STATE.currentLanguage].existingQuestions;
+  
+  // Update question ordering buttons
+  if (DOM.reorderModeBtn) {
+    DOM.reorderModeBtn.textContent = translations[STATE.currentLanguage].reorderMode || 'Reorder Questions';
+  }
+  
+  if (DOM.saveOrderBtn) {
+    DOM.saveOrderBtn.textContent = translations[STATE.currentLanguage].saveOrder || 'Save Order';
+  }
+  
+  if (DOM.cancelOrderBtn) {
+    DOM.cancelOrderBtn.textContent = translations[STATE.currentLanguage].cancel || 'Cancel';
+  }
   
   // Update responses tab
   document.querySelector('#responses-tab h2').textContent = 
@@ -368,10 +399,53 @@ function renderQuestions(questions) {
     return;
   }
   
+  // Store the questions in the state for reordering
+  STATE.allQuestions = questions;
+  
+  // Create a container for the ordering buttons if it doesn't exist
+  let orderingButtons = document.querySelector('.ordering-buttons');
+  if (!orderingButtons) {
+    orderingButtons = document.createElement('div');
+    orderingButtons.className = 'ordering-buttons';
+    
+    // Create reorder mode button
+    DOM.reorderModeBtn = document.createElement('button');
+    DOM.reorderModeBtn.id = 'reorder-mode-btn';
+    DOM.reorderModeBtn.className = 'btn primary';
+    DOM.reorderModeBtn.textContent = translations[STATE.currentLanguage].reorderMode || 'Reorder Questions';
+    DOM.reorderModeBtn.addEventListener('click', enableReorderMode);
+    
+    // Create save order button (initially hidden)
+    DOM.saveOrderBtn = document.createElement('button');
+    DOM.saveOrderBtn.id = 'save-order-btn';
+    DOM.saveOrderBtn.className = 'btn success';
+    DOM.saveOrderBtn.textContent = translations[STATE.currentLanguage].saveOrder || 'Save Order';
+    DOM.saveOrderBtn.style.display = 'none';
+    DOM.saveOrderBtn.addEventListener('click', saveQuestionOrder);
+    
+    // Create cancel button (initially hidden)
+    DOM.cancelOrderBtn = document.createElement('button');
+    DOM.cancelOrderBtn.id = 'cancel-order-btn';
+    DOM.cancelOrderBtn.className = 'btn danger';
+    DOM.cancelOrderBtn.textContent = translations[STATE.currentLanguage].cancel || 'Cancel';
+    DOM.cancelOrderBtn.style.display = 'none';
+    DOM.cancelOrderBtn.addEventListener('click', cancelReorderMode);
+    
+    // Add buttons to container
+    orderingButtons.appendChild(DOM.reorderModeBtn);
+    orderingButtons.appendChild(DOM.saveOrderBtn);
+    orderingButtons.appendChild(DOM.cancelOrderBtn);
+    
+    // Add container before the questions list
+    const questionsContainer = document.querySelector('#questions-tab h2:last-of-type');
+    questionsContainer.parentNode.insertBefore(orderingButtons, questionsContainer.nextSibling);
+  }
+  
   questions.forEach(question => {
     const questionItem = document.createElement('div');
     questionItem.className = 'question-item';
     questionItem.dataset.id = question._id;
+    questionItem.dataset.order = question.order || 9999;
     
     let questionTypeDisplay = question.questionType === 'text' 
       ? translations[STATE.currentLanguage].textResponse 
@@ -389,7 +463,11 @@ function renderQuestions(questions) {
       `;
     }
     
+    // Add order number display
+    const orderDisplay = `<div class="question-order">${question.order || '-'}</div>`;
+    
     questionItem.innerHTML = `
+      ${orderDisplay}
       <h3>${question.text}</h3>
       <p><strong>${translations[STATE.currentLanguage].type}:</strong> ${questionTypeDisplay}</p>
       <p><strong>${translations[STATE.currentLanguage].status}:</strong> ${question.isActive ? translations[STATE.currentLanguage].active : translations[STATE.currentLanguage].inactive}</p>
@@ -1667,6 +1745,241 @@ function createSentimentChart(question, sentiments, canvas) {
     ctx.textAlign = 'center';
     ctx.fillText('Error rendering sentiment chart', canvas.width / 2, canvas.height / 2);
   }
+}
+
+/**
+ * Enable question reordering mode
+ */
+function enableReorderMode() {
+  // Hide regular buttons and show ordering buttons
+  DOM.reorderModeBtn.style.display = 'none';
+  DOM.saveOrderBtn.style.display = 'inline-block';
+  DOM.cancelOrderBtn.style.display = 'inline-block';
+  
+  // Add reordering class to questions list
+  DOM.questionsList.classList.add('reordering');
+  
+  // Add drag handles and make items draggable
+  const questionItems = DOM.questionsList.querySelectorAll('.question-item');
+  questionItems.forEach(item => {
+    // Add drag handle
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'drag-handle';
+    dragHandle.innerHTML = '&#8942;&#8942;'; // Unicode for vertical dots
+    item.insertBefore(dragHandle, item.firstChild);
+    
+    // Make item draggable
+    item.draggable = true;
+    
+    // Add drag event listeners
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragover', handleDragOver);
+    item.addEventListener('drop', handleDrop);
+    item.addEventListener('dragend', handleDragEnd);
+    
+    // Hide edit and delete buttons during reordering
+    const actionButtons = item.querySelectorAll('.question-actions button');
+    actionButtons.forEach(button => {
+      button.style.display = 'none';
+    });
+  });
+  
+  // Show a message to the user
+  showSuccess(translations[STATE.currentLanguage].reorderInstructions || 'Drag and drop questions to reorder them, then click Save Order');
+}
+
+/**
+ * Handle the start of a drag operation
+ * @param {DragEvent} e - The drag event
+ */
+function handleDragStart(e) {
+  // Add a class to indicate the item being dragged
+  this.classList.add('dragging');
+  
+  // Store the ID of the dragged item
+  e.dataTransfer.setData('text/plain', this.dataset.id);
+  
+  // Set the drag effect
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+/**
+ * Handle the dragover event to allow dropping
+ * @param {DragEvent} e - The drag event
+ */
+function handleDragOver(e) {
+  // Prevent default to allow drop
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  
+  // Add a class to indicate a valid drop target
+  this.classList.add('drag-over');
+}
+
+/**
+ * Handle the drop event
+ * @param {DragEvent} e - The drag event
+ */
+function handleDrop(e) {
+  e.preventDefault();
+  
+  // Get the ID of the dragged item
+  const draggedId = e.dataTransfer.getData('text/plain');
+  const draggedItem = document.querySelector(`.question-item[data-id="${draggedId}"]`);
+  
+  // Don't do anything if dropping onto the same item
+  if (draggedItem === this) {
+    return;
+  }
+  
+  // Determine if we're dropping before or after this item
+  const rect = this.getBoundingClientRect();
+  const dropY = e.clientY;
+  const dropPosition = dropY < rect.top + rect.height / 2 ? 'before' : 'after';
+  
+  // Insert the dragged item
+  if (dropPosition === 'before') {
+    this.parentNode.insertBefore(draggedItem, this);
+  } else {
+    this.parentNode.insertBefore(draggedItem, this.nextSibling);
+  }
+  
+  // Remove the drag-over class
+  this.classList.remove('drag-over');
+  
+  // Update the order numbers visually
+  updateOrderNumbers();
+}
+
+/**
+ * Handle the end of a drag operation
+ */
+function handleDragEnd() {
+  // Remove the dragging class
+  this.classList.remove('dragging');
+  
+  // Remove drag-over class from all items
+  const items = document.querySelectorAll('.question-item');
+  items.forEach(item => {
+    item.classList.remove('drag-over');
+  });
+}
+
+/**
+ * Update the order numbers displayed on the questions
+ */
+function updateOrderNumbers() {
+  const questionItems = DOM.questionsList.querySelectorAll('.question-item');
+  questionItems.forEach((item, index) => {
+    const orderDisplay = item.querySelector('.question-order');
+    if (orderDisplay) {
+      orderDisplay.textContent = index + 1;
+    }
+  });
+}
+
+/**
+ * Save the new question order to the server
+ */
+async function saveQuestionOrder() {
+  try {
+    // Get all question items
+    const questionItems = DOM.questionsList.querySelectorAll('.question-item');
+    
+    // Create an array of questions with their new order
+    const questions = Array.from(questionItems).map((item, index) => {
+      return {
+        id: item.dataset.id,
+        order: index + 1
+      };
+    });
+    
+    console.log('Saving question order:', questions);
+    
+    // Log the API URL for debugging
+    const apiUrl = '/api/questions/order'; // Use the direct endpoint
+    console.log('Using direct API URL:', apiUrl);
+    
+    // Send the updated order to the server
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ questions })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from server:', response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Order update response:', result);
+    
+    // Exit reorder mode
+    exitReorderMode();
+    
+    // Show success message
+    showSuccess(translations[STATE.currentLanguage].orderSaved || 'Question order saved successfully');
+    
+    // Reload questions to show the new order
+    loadQuestions();
+  } catch (error) {
+    console.error('Error in saveQuestionOrder:', error);
+    showError(`Error saving question order: ${error.message}`);
+  }
+}
+
+/**
+ * Cancel reordering and revert to the original order
+ */
+function cancelReorderMode() {
+  // Exit reorder mode
+  exitReorderMode();
+  
+  // Reload questions to restore the original order
+  loadQuestions();
+}
+
+/**
+ * Exit reorder mode and clean up
+ */
+function exitReorderMode() {
+  // Show regular buttons and hide ordering buttons
+  DOM.reorderModeBtn.style.display = 'inline-block';
+  DOM.saveOrderBtn.style.display = 'none';
+  DOM.cancelOrderBtn.style.display = 'none';
+  
+  // Remove reordering class from questions list
+  DOM.questionsList.classList.remove('reordering');
+  
+  // Remove drag handles and event listeners
+  const questionItems = DOM.questionsList.querySelectorAll('.question-item');
+  questionItems.forEach(item => {
+    // Remove drag handle
+    const dragHandle = item.querySelector('.drag-handle');
+    if (dragHandle) {
+      dragHandle.remove();
+    }
+    
+    // Make item not draggable
+    item.draggable = false;
+    
+    // Remove drag event listeners
+    item.removeEventListener('dragstart', handleDragStart);
+    item.removeEventListener('dragover', handleDragOver);
+    item.removeEventListener('drop', handleDrop);
+    item.removeEventListener('dragend', handleDragEnd);
+    
+    // Show edit and delete buttons again
+    const actionButtons = item.querySelectorAll('.question-actions button');
+    actionButtons.forEach(button => {
+      button.style.display = 'inline-block';
+    });
+  });
 }
 
 /**

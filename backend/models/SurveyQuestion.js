@@ -25,6 +25,10 @@ const SurveyQuestionSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  order: {
+    type: Number,
+    default: 9999 // Default to a high number so new questions appear at the end
   }
 });
 

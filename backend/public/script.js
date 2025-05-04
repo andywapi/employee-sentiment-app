@@ -16,7 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const STATE = {
     currentLanguage: localStorage.getItem('language') || 'en',
     weatherData: null,
-    temperatureUnit: localStorage.getItem('temperatureUnit') || 'C' // Default to Celsius
+    temperatureUnit: localStorage.getItem('temperatureUnit') || 'C', // Default to Celsius
+    questions: [],
+    currentQuestionIndex: 0,
+    responses: new Map()
   };
   
   // DOM Elements
@@ -25,7 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
     form: document.getElementById('survey-form'),
     questionsDiv: document.getElementById('questions'),
     submitButton: document.querySelector('button[type="submit"]'),
-    weatherDisplay: document.getElementById('weather-display')
+    weatherDisplay: document.getElementById('weather-display'),
+    progressIndicator: document.getElementById('progress-indicator'),
+    navigationButtons: document.getElementById('navigation-buttons')
   };
 
   /**
@@ -107,6 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Update display
       updateWeatherDisplay();
     });
+    
+    // Navigation button events will be set up in renderNavigation()
   }
   
   /**
@@ -148,9 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (STATE.weatherData) {
       updateWeatherDisplay();
     }
-    
-    // Reload questions to update their text
-    loadQuestions();
   }
   
   /**
@@ -160,89 +164,371 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       showLoading(DOM.questionsDiv);
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/questions`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/questions?active=true`, {
         headers: getAuthHeaders()
       });
       
       if (!response.ok) {
-        // If unauthorized, redirect to login
-        if (response.status === 401) {
-          localStorage.removeItem('auth_credentials');
-          window.location.href = '/login.html';
-          return;
-        }
-        
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error('Failed to load questions');
       }
       
       const result = await response.json();
-      const questions = result.data || result; // Handle both formats
       
-      if (!questions || questions.length === 0) {
-        DOM.questionsDiv.innerHTML = `<p class="no-questions">${translations[STATE.currentLanguage].noQuestionsAvailable || 'No questions available at this time.'}</p>`;
+      // Handle both response formats (array or {success, data})
+      const questions = Array.isArray(result) ? result : (result.data || []);
+      
+      if (questions.length === 0) {
+        DOM.questionsDiv.innerHTML = `
+          <div class="no-questions">
+            ${translations[STATE.currentLanguage].noQuestionsMessage || 'No questions found.'}
+          </div>
+        `;
+        DOM.submitButton.style.display = 'none';
+        DOM.progressIndicator.style.display = 'none';
+        DOM.navigationButtons.style.display = 'none';
         return;
       }
       
-      renderQuestions(questions);
+      // Sort questions by order if available
+      STATE.questions = questions.sort((a, b) => (a.order || 9999) - (b.order || 9999));
+      STATE.currentQuestionIndex = 0;
+      STATE.responses = new Map();
+      
+      renderCurrentQuestion();
+      renderProgressIndicator();
+      renderNavigation();
+      
+      DOM.submitButton.style.display = 'none'; // Hide the submit button until the last question
     } catch (error) {
       console.error('Error loading questions:', error);
-      DOM.questionsDiv.innerHTML = `<p class="error">${translations[STATE.currentLanguage].errorLoadingQuestions || 'Error loading questions. Please try again later.'}</p>`;
+      DOM.questionsDiv.innerHTML = `
+        <div class="error">
+          ${translations[STATE.currentLanguage].failedToLoad || 'Failed to load questions. Please try again.'}
+        </div>
+      `;
     }
   }
   
   /**
-   * Render questions in the survey form
-   * @param {Array} questions - Array of question objects
+   * Render the current question based on the currentQuestionIndex
    */
-  function renderQuestions(questions) {
+  function renderCurrentQuestion() {
     DOM.questionsDiv.innerHTML = ''; // Clear existing questions
     
-    questions.forEach(question => {
-      const questionDiv = document.createElement('div');
-      questionDiv.className = 'question';
-      questionDiv.dataset.id = question._id;
-      questionDiv.dataset.type = question.questionType;
+    if (STATE.questions.length === 0) return;
+    
+    const question = STATE.questions[STATE.currentQuestionIndex];
+    
+    const questionDiv = document.createElement('div');
+    questionDiv.className = 'question';
+    questionDiv.dataset.id = question._id;
+    questionDiv.dataset.type = question.questionType;
+    
+    // Create question label
+    const questionLabel = document.createElement('p');
+    questionLabel.className = 'question-label';
+    questionLabel.textContent = question.text;
+    questionDiv.appendChild(questionLabel);
+    
+    // Create input based on question type
+    if (question.questionType === 'text') {
+      const textarea = document.createElement('textarea');
+      textarea.name = question._id;
+      textarea.maxLength = 100;
+      textarea.required = true;
+      textarea.placeholder = STATE.currentLanguage === 'en' ? 
+        "Enter your response (max 100 characters)" : 
+        "Ingrese su respuesta (máximo 100 caracteres)";
       
-      // Create question label
-      const questionLabel = document.createElement('p');
-      questionLabel.className = 'question-label';
-      questionLabel.textContent = question.text;
-      questionDiv.appendChild(questionLabel);
-      
-      // Create input based on question type
-      if (question.questionType === 'text') {
-        const textarea = document.createElement('textarea');
-        textarea.name = question._id;
-        textarea.maxLength = 100;
-        textarea.required = true;
-        textarea.placeholder = STATE.currentLanguage === 'en' ? 
-          "Enter your response (max 100 characters)" : 
-          "Ingrese su respuesta (máximo 100 caracteres)";
-        questionDiv.appendChild(textarea);
-      } else if (question.questionType === 'multipleChoice' && question.options && question.options.length > 0) {
-        const optionsContainer = document.createElement('div');
-        optionsContainer.className = 'options-container';
-        
-        question.options.forEach(option => {
-          const optionLabel = document.createElement('label');
-          optionLabel.className = 'radio-label';
-          
-          const radioInput = document.createElement('input');
-          radioInput.type = 'radio';
-          radioInput.name = question._id;
-          radioInput.value = option;
-          radioInput.required = true;
-          
-          optionLabel.appendChild(radioInput);
-          optionLabel.append(` ${option}`);
-          optionsContainer.appendChild(optionLabel);
-        });
-        
-        questionDiv.appendChild(optionsContainer);
+      // If we have a saved response for this question, populate it
+      if (STATE.responses.has(question._id)) {
+        textarea.value = STATE.responses.get(question._id);
       }
       
-      DOM.questionsDiv.appendChild(questionDiv);
+      // Add event listener to save response as user types
+      textarea.addEventListener('input', (e) => {
+        STATE.responses.set(question._id, e.target.value);
+      });
+      
+      questionDiv.appendChild(textarea);
+    } else if (question.questionType === 'multipleChoice' && question.options && question.options.length > 0) {
+      const optionsContainer = document.createElement('div');
+      optionsContainer.className = 'options-container';
+      
+      question.options.forEach(option => {
+        const optionLabel = document.createElement('label');
+        optionLabel.className = 'radio-label';
+        
+        const radioInput = document.createElement('input');
+        radioInput.type = 'radio';
+        radioInput.name = question._id;
+        radioInput.value = option;
+        radioInput.required = true;
+        
+        // If we have a saved response for this question, check the appropriate radio button
+        if (STATE.responses.has(question._id) && STATE.responses.get(question._id) === option) {
+          radioInput.checked = true;
+        }
+        
+        // Add event listener to save response when selected
+        radioInput.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            STATE.responses.set(question._id, e.target.value);
+          }
+        });
+        
+        optionLabel.appendChild(radioInput);
+        optionLabel.append(` ${option}`);
+        optionsContainer.appendChild(optionLabel);
+      });
+      
+      questionDiv.appendChild(optionsContainer);
+    }
+    
+    DOM.questionsDiv.appendChild(questionDiv);
+    
+    // Update submit button visibility
+    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
+      DOM.submitButton.style.display = 'block';
+    } else {
+      DOM.submitButton.style.display = 'none';
+    }
+  }
+  
+  /**
+   * Render the subway-style progress indicator
+   */
+  function renderProgressIndicator() {
+    DOM.progressIndicator.innerHTML = '';
+    
+    if (STATE.questions.length === 0) return;
+    
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'subway-progress';
+    
+    STATE.questions.forEach((question, index) => {
+      // Create station indicator
+      const station = document.createElement('div');
+      station.className = 'subway-station';
+      
+      // Add appropriate classes based on progress
+      if (index < STATE.currentQuestionIndex) {
+        station.classList.add('completed');
+      } else if (index === STATE.currentQuestionIndex) {
+        station.classList.add('current');
+      }
+      
+      // Add station number
+      const stationNumber = document.createElement('span');
+      stationNumber.className = 'station-number';
+      stationNumber.textContent = index + 1;
+      station.appendChild(stationNumber);
+      
+      // Add station to container
+      progressContainer.appendChild(station);
+      
+      // Add connecting line (except for the last station)
+      if (index < STATE.questions.length - 1) {
+        const line = document.createElement('div');
+        line.className = 'subway-line';
+        
+        // Add appropriate classes based on progress
+        if (index < STATE.currentQuestionIndex) {
+          line.classList.add('completed');
+        }
+        
+        progressContainer.appendChild(line);
+      }
     });
+    
+    DOM.progressIndicator.appendChild(progressContainer);
+  }
+  
+  /**
+   * Render navigation buttons (previous/next)
+   */
+  function renderNavigation() {
+    DOM.navigationButtons.innerHTML = '';
+    
+    if (STATE.questions.length === 0) return;
+    
+    const navContainer = document.createElement('div');
+    navContainer.className = 'navigation-container';
+    
+    // Previous button
+    const prevButton = document.createElement('button');
+    prevButton.type = 'button';
+    prevButton.className = 'nav-button prev-button';
+    prevButton.textContent = STATE.currentLanguage === 'en' ? 'Previous' : 'Anterior';
+    prevButton.disabled = STATE.currentQuestionIndex === 0;
+    prevButton.addEventListener('click', goToPreviousQuestion);
+    navContainer.appendChild(prevButton);
+    
+    // Next button
+    const nextButton = document.createElement('button');
+    nextButton.type = 'button';
+    nextButton.className = 'nav-button next-button';
+    nextButton.textContent = STATE.currentLanguage === 'en' ? 'Next' : 'Siguiente';
+    nextButton.disabled = STATE.currentQuestionIndex === STATE.questions.length - 1;
+    nextButton.addEventListener('click', goToNextQuestion);
+    navContainer.appendChild(nextButton);
+    
+    DOM.navigationButtons.appendChild(navContainer);
+  }
+  
+  /**
+   * Go to the previous question
+   */
+  function goToPreviousQuestion() {
+    if (STATE.currentQuestionIndex > 0) {
+      STATE.currentQuestionIndex--;
+      renderCurrentQuestion();
+      renderProgressIndicator();
+      renderNavigation();
+    }
+  }
+  
+  /**
+   * Go to the next question
+   */
+  function goToNextQuestion() {
+    const currentQuestion = STATE.questions[STATE.currentQuestionIndex];
+    
+    // Validate the current question has a response before proceeding
+    if (!validateCurrentQuestion(currentQuestion)) {
+      return;
+    }
+    
+    if (STATE.currentQuestionIndex < STATE.questions.length - 1) {
+      STATE.currentQuestionIndex++;
+      renderCurrentQuestion();
+      renderProgressIndicator();
+      renderNavigation();
+      
+      // Scroll to top of the question
+      DOM.questionsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+  
+  /**
+   * Validate that the current question has a valid response
+   * @param {Object} question - The current question object
+   * @returns {boolean} Whether the question has a valid response
+   */
+  function validateCurrentQuestion(question) {
+    if (!question) return false;
+    
+    // Check if we have a response for this question
+    if (!STATE.responses.has(question._id)) {
+      showError(STATE.currentLanguage === 'en' ? 
+        'Please answer the question before proceeding.' : 
+        'Por favor responda la pregunta antes de continuar.');
+      return false;
+    }
+    
+    // For text questions, check if the response is not empty
+    if (question.questionType === 'text' && STATE.responses.get(question._id).trim() === '') {
+      showError(STATE.currentLanguage === 'en' ? 
+        'Please enter a response before proceeding.' : 
+        'Por favor ingrese una respuesta antes de continuar.');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Fetch weather data for the user's location
+   */
+  async function getWeatherData() {
+    try {
+      // Check if the weather display element exists
+      if (!DOM.weatherDisplay) return;
+      
+      // Show loading in weather display
+      DOM.weatherDisplay.innerHTML = `
+        <div class="weather-loading">
+          <div class="loading-spinner-small"></div>
+        </div>
+      `;
+      
+      // Get user's location
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            
+            // Fetch weather data from API
+            const response = await fetch(`${API_CONFIG.WEATHER_API}${latitude},${longitude}`);
+            
+            if (!response.ok) {
+              throw new Error('Weather API error');
+            }
+            
+            const data = await response.json();
+            
+            // Save weather data to state
+            STATE.weatherData = {
+              location: data.location.name,
+              tempC: data.current.temp_c,
+              tempF: data.current.temp_f,
+              condition: data.current.condition.text,
+              icon: data.current.condition.icon
+            };
+            
+            // Update weather display
+            updateWeatherDisplay();
+          } catch (error) {
+            console.error('Error fetching weather:', error);
+            DOM.weatherDisplay.innerHTML = `
+              <div class="weather-error">
+                <i class="weather-icon">🌦️</i>
+                <span>${STATE.currentLanguage === 'en' ? 'Weather unavailable' : 'Clima no disponible'}</span>
+              </div>
+            `;
+          }
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          DOM.weatherDisplay.innerHTML = `
+            <div class="weather-error">
+              <i class="weather-icon">📍</i>
+              <span>${STATE.currentLanguage === 'en' ? 'Location access denied' : 'Acceso a ubicación denegado'}</span>
+            </div>
+          `;
+        }
+      );
+    } catch (error) {
+      console.error('Weather feature error:', error);
+    }
+  }
+  
+  /**
+   * Update the weather display with current data and preferences
+   */
+  function updateWeatherDisplay() {
+    // Check if weather display element exists and we have data
+    if (!DOM.weatherDisplay || !STATE.weatherData) return;
+    
+    const { location, tempC, tempF, condition, icon } = STATE.weatherData;
+    const temp = STATE.temperatureUnit === 'C' ? tempC : tempF;
+    const unit = STATE.temperatureUnit;
+    
+    DOM.weatherDisplay.innerHTML = `
+      <div class="weather-container">
+        <img src="${icon}" alt="${condition}" class="weather-icon" />
+        <div class="weather-info">
+          <div class="weather-location">${location}</div>
+          <div class="weather-temp">${Math.round(temp)}°${unit}</div>
+          <div class="weather-condition">${condition}</div>
+        </div>
+      </div>
+    `;
+    
+    // Add tooltip to indicate you can click to change units
+    DOM.weatherDisplay.title = STATE.currentLanguage === 'en' 
+      ? 'Click to toggle between °C and °F' 
+      : 'Haga clic para cambiar entre °C y °F';
   }
   
   /**
@@ -253,37 +539,46 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     
     try {
-      // Disable submit button to prevent multiple submissions
-      DOM.submitButton.disabled = true;
-      DOM.submitButton.textContent = STATE.currentLanguage === 'en' ? 'Submitting...' : 'Enviando...';
-      
-      const formData = new FormData(DOM.form);
-      const userId = formData.get('userId');
+      // Validate userId
+      const userId = document.getElementById('userId').value.trim();
       
       if (!userId) {
         showError(translations[STATE.currentLanguage].userIdRequired || 'User ID is required');
         return;
       }
       
+      // Validate all questions have responses
+      const unansweredQuestions = STATE.questions.filter(q => !STATE.responses.has(q._id));
+      
+      if (unansweredQuestions.length > 0) {
+        showError(STATE.currentLanguage === 'en' ? 
+          'Please answer all questions before submitting.' : 
+          'Por favor responda todas las preguntas antes de enviar.');
+        return;
+      }
+      
+      // Disable submit button to prevent multiple submissions
+      DOM.submitButton.disabled = true;
+      DOM.submitButton.textContent = STATE.currentLanguage === 'en' ? 'Submitting...' : 'Enviando...';
+      
       const promises = [];
       
-      // Collect all responses
-      formData.forEach((value, key) => {
-        if (key === 'userId') return;
+      // Send each response to the API
+      STATE.questions.forEach(question => {
+        const response = STATE.responses.get(question._id);
         
-        const questionElement = document.querySelector(`.question[data-id="${key}"]`);
-        const questionType = questionElement ? questionElement.dataset.type : 'text';
+        if (!response) return;
         
         // Create the appropriate payload based on question type
         const payload = {
           userId,
-          questionId: key
+          questionId: question._id
         };
         
-        if (questionType === 'text') {
-          payload.responseText = value;
+        if (question.questionType === 'text') {
+          payload.responseText = response;
         } else {
-          payload.selectedOption = value;
+          payload.selectedOption = response;
         }
         
         // Send the response
@@ -407,89 +702,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
       errorMessage.remove();
     }, 5000);
-  }
-  
-  /**
-   * Get weather data based on user's IP geolocation
-   */
-  async function getWeatherData() {
-    try {
-      // First, get the user's IP address
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
-      const ipData = await ipResponse.json();
-      const userIp = ipData.ip;
-      
-      // Then, get geolocation data from the IP
-      const geoResponse = await fetch(`https://ipapi.co/${userIp}/json/`);
-      const geoData = await geoResponse.json();
-      
-      // Finally, get weather data for the location
-      // Using a free weather API that doesn't require an API key for development
-      const weatherResponse = await fetch(`https://wttr.in/${geoData.city}?format=j1`);
-      const weatherData = await weatherResponse.json();
-      
-      // Store weather data in state
-      STATE.weatherData = {
-        temperature_C: weatherData.current_condition[0].temp_C,
-        temperature_F: weatherData.current_condition[0].temp_F,
-        condition: weatherData.current_condition[0].weatherDesc[0].value,
-        city: geoData.city
-      };
-      
-      // Update the weather display
-      updateWeatherDisplay();
-    } catch (error) {
-      console.error('Error fetching weather data:', error);
-      // Show a fallback message
-      DOM.weatherDisplay.innerHTML = `
-        <span class="icon">🌡️</span>
-        <span class="temp">Weather unavailable</span>
-      `;
-    }
-  }
-  
-  /**
-   * Update the weather display with the fetched data
-   */
-  function updateWeatherDisplay() {
-    if (!STATE.weatherData) return;
-    
-    // Get weather icon based on condition
-    let weatherIcon = '🌡️'; // Default icon
-    const condition = STATE.weatherData.condition.toLowerCase();
-    
-    if (condition.includes('sun') || condition.includes('clear')) {
-      weatherIcon = '☀️';
-    } else if (condition.includes('cloud')) {
-      weatherIcon = '☁️';
-    } else if (condition.includes('rain') || condition.includes('drizzle')) {
-      weatherIcon = '🌧️';
-    } else if (condition.includes('snow')) {
-      weatherIcon = '❄️';
-    } else if (condition.includes('thunder') || condition.includes('storm')) {
-      weatherIcon = '⛈️';
-    } else if (condition.includes('fog') || condition.includes('mist')) {
-      weatherIcon = '🌫️';
-    }
-    
-    // Get temperature in the current unit
-    const temperature = STATE.temperatureUnit === 'C' 
-      ? STATE.weatherData.temperature_C 
-      : STATE.weatherData.temperature_F;
-    
-    // Update the DOM
-    DOM.weatherDisplay.innerHTML = `
-      <span class="icon">${weatherIcon}</span>
-      <span class="temp">${temperature}°${STATE.temperatureUnit} ${STATE.weatherData.city}</span>
-    `;
-    
-    // Add title attribute for tooltip
-    DOM.weatherDisplay.title = STATE.currentLanguage === 'en' 
-      ? 'Click to toggle between °C and °F' 
-      : 'Haga clic para cambiar entre °C y °F';
-    
-    // Add cursor style to indicate it's clickable
-    DOM.weatherDisplay.style.cursor = 'pointer';
   }
   
   // Initialize the application
