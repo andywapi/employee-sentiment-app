@@ -680,16 +680,25 @@ async function loadUserResponses(userId) {
  */
 async function loadAllResponses() {
   try {
+    console.log('Fetching all responses...');
+    
     const response = await fetch(`${API_CONFIG.BASE_URL}/responses`, {
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(),
+      credentials: 'include'
     });
     
     if (!response.ok) {
+      console.error('Error fetching responses:', response.status, response.statusText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    STATE.allResponses = await response.json();
+    const data = await response.json();
+    
+    // Ensure we have an array
+    STATE.allResponses = Array.isArray(data) ? data : [];
+    console.log(`Loaded ${STATE.allResponses.length} responses`);
   } catch (error) {
+    console.error('Error in loadAllResponses:', error);
     showError(`Error loading responses for analytics: ${error.message}`);
   }
 }
@@ -708,7 +717,7 @@ async function loadQuestionCharts() {
       
       // Add a title
       const title = document.createElement('h3');
-      title.textContent = 'Multiple Choice Question Results';
+      title.textContent = translations[STATE.currentLanguage].questionCharts || 'Multiple Choice Question Results';
       questionChartsContainer.appendChild(title);
       
       // Add the container to the analytics tab
@@ -716,16 +725,20 @@ async function loadQuestionCharts() {
       analyticsTab.appendChild(questionChartsContainer);
     } else {
       // Clear existing charts
-      questionChartsContainer.innerHTML = '<h3>Multiple Choice Question Results</h3>';
+      questionChartsContainer.innerHTML = `<h3>${translations[STATE.currentLanguage].questionCharts || 'Multiple Choice Question Results'}</h3>`;
     }
     
     // Fetch all questions if not already loaded
     if (!STATE.allQuestions || !Array.isArray(STATE.allQuestions) || STATE.allQuestions.length === 0) {
+      console.log('Fetching all questions...');
+      
       const questionsResponse = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       });
       
       if (!questionsResponse.ok) {
+        console.error('Error fetching questions:', questionsResponse.status, questionsResponse.statusText);
         throw new Error(`HTTP error! status: ${questionsResponse.status}`);
       }
       
@@ -733,26 +746,12 @@ async function loadQuestionCharts() {
       
       // Ensure we have an array
       STATE.allQuestions = Array.isArray(data) ? data : [];
-      
-      console.log('Loaded questions:', STATE.allQuestions);
+      console.log(`Loaded ${STATE.allQuestions.length} questions`);
     }
     
     // Fetch all responses if not already loaded
     if (!STATE.allResponses || !Array.isArray(STATE.allResponses) || STATE.allResponses.length === 0) {
-      const responsesResponse = await fetch(`${API_CONFIG.BASE_URL}/responses`, {
-        headers: getAuthHeaders()
-      });
-      
-      if (!responsesResponse.ok) {
-        throw new Error(`HTTP error! status: ${responsesResponse.status}`);
-      }
-      
-      const data = await responsesResponse.json();
-      
-      // Ensure we have an array
-      STATE.allResponses = Array.isArray(data) ? data : [];
-      
-      console.log('Loaded responses:', STATE.allResponses);
+      await loadAllResponses();
     }
     
     // Ensure we have arrays before filtering
@@ -792,6 +791,7 @@ async function loadQuestionCharts() {
       canvas.style.height = 'auto';
       canvas.width = 400;
       canvas.height = 300;
+      
       questionChartContainer.appendChild(canvas);
       
       // Add the question chart to the container
@@ -821,7 +821,7 @@ async function loadSentimentCharts() {
       
       // Add a title
       const title = document.createElement('h3');
-      title.textContent = 'Sentiment Analysis for Open-Ended Questions';
+      title.textContent = translations[STATE.currentLanguage].sentimentAnalysis || 'Sentiment Analysis for Open-Ended Questions';
       sentimentChartsContainer.appendChild(title);
       
       // Add the container to the analytics tab
