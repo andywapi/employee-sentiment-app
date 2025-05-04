@@ -1,6 +1,7 @@
 {
-  "name": "employee-sentiment-backend",
+  "name": "employee-sentiment-app-backend",
   "version": "1.0.0",
+  "description": "Backend for Employee Sentiment App",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -16,5 +17,8 @@
   },
   "devDependencies": {
     "nodemon": "^2.0.20"
+  },
+  "engines": {
+    "node": "16.x"
   }
 }

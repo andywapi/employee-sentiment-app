@@ -23,11 +23,47 @@ document.addEventListener('DOMContentLoaded', () => {
     questionsDiv: document.getElementById('questions'),
     submitButton: document.querySelector('button[type="submit"]')
   };
+
+  /**
+   * Helper function to get auth headers for API requests
+   * @returns {Object} Headers object with authorization
+   */
+  function getAuthHeaders() {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Add auth header if credentials exist
+    const credentials = localStorage.getItem('auth_credentials');
+    if (credentials) {
+      headers['Authorization'] = `Basic ${credentials}`;
+    }
+    
+    return headers;
+  }
+  
+  /**
+   * Check if user is authenticated and redirect to login if not
+   */
+  function checkAuth() {
+    // Skip in development mode
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return;
+    }
+    
+    const credentials = localStorage.getItem('auth_credentials');
+    if (!credentials) {
+      window.location.href = '/login.html';
+    }
+  }
   
   /**
    * Initialize the application
    */
   function init() {
+    // Check authentication
+    checkAuth();
+    
     // Set initial language
     DOM.languageSelect.value = STATE.currentLanguage;
     
@@ -102,9 +138,18 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       showLoading(DOM.questionsDiv);
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/questions`);
+      const response = await fetch(`${API_CONFIG.BASE_URL}/questions`, {
+        headers: getAuthHeaders()
+      });
       
       if (!response.ok) {
+        // If unauthorized, redirect to login
+        if (response.status === 401) {
+          localStorage.removeItem('auth_credentials');
+          window.location.href = '/login.html';
+          return;
+        }
+        
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -223,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         promises.push(
           fetch(`${API_CONFIG.BASE_URL}/responses`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(payload)
           })
         );

@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const surveyRoutes = require('./routes/surveyRoutes');
+const { authenticate } = require('./middleware/auth');
 
 // Load environment variables
 dotenv.config();
@@ -20,32 +21,32 @@ app.use(cors());
 app.use(express.json());
 
 /**
- * Connect to MongoDB
- * @returns {Promise} MongoDB connection promise
+ * MongoDB Connection
  */
 const connectDB = async () => {
   try {
-    await mongoose.connect(MONGODB_URI, {
+    // Use MONGODB_URI from environment variables
+    const mongoURI = process.env.MONGODB_URI;
+    
+    console.log(`Connecting to MongoDB...`);
+    const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
     });
     
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('MongoDB connected successfully');
-    }
-    
-    return mongoose.connection;
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error('MongoDB connection error:', error.message);
+    console.error(`Error connecting to MongoDB: ${error.message}`);
     // Exit process with failure
     process.exit(1);
   }
 };
 
-// Initialize database connection
+// Connect to MongoDB
 connectDB();
 
-// API Routes
+// API Routes - Apply authentication middleware to all API routes
+app.use(API_PREFIX, authenticate);
 app.use(API_PREFIX, surveyRoutes);
 
 // Serve static frontend

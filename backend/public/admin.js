@@ -50,9 +50,45 @@ const DOM = {
 };
 
 /**
+ * Helper function to get auth headers for API requests
+ * @returns {Object} Headers object with authorization
+ */
+function getAuthHeaders() {
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  
+  // Add auth header if credentials exist
+  const credentials = localStorage.getItem('auth_credentials');
+  if (credentials) {
+    headers['Authorization'] = `Basic ${credentials}`;
+  }
+  
+  return headers;
+}
+
+/**
+ * Check if user is authenticated and redirect to login if not
+ */
+function checkAuth() {
+  // Skip in development mode
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return;
+  }
+  
+  const credentials = localStorage.getItem('auth_credentials');
+  if (!credentials) {
+    window.location.href = '/login.html';
+  }
+}
+
+/**
  * Initialize the application
  */
 function init() {
+  // Check authentication
+  checkAuth();
+  
   // Set initial language
   DOM.languageSelect.value = STATE.currentLanguage;
   
@@ -255,14 +291,14 @@ async function handleQuestionFormSubmit(e) {
       // Update existing question
       response = await fetch(`${API_CONFIG.BASE_URL}/questions/${STATE.currentEditId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(questionData)
       });
     } else {
       // Create new question
       response = await fetch(`${API_CONFIG.BASE_URL}/questions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(questionData)
       });
     }
@@ -298,9 +334,18 @@ async function handleQuestionFormSubmit(e) {
  */
 async function loadQuestions() {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/questions`);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
+      headers: getAuthHeaders()
+    });
     
     if (!response.ok) {
+      // If unauthorized, redirect to login
+      if (response.status === 401) {
+        localStorage.removeItem('auth_credentials');
+        window.location.href = '/login.html';
+        return;
+      }
+      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -426,7 +471,8 @@ function editQuestion(question) {
 async function deleteQuestion(id) {
   try {
     const response = await fetch(`${API_CONFIG.BASE_URL}/questions/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     
     if (!response.ok) {
@@ -445,7 +491,9 @@ async function deleteQuestion(id) {
  */
 async function loadUsers() {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/responses/users`);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/responses/users`, {
+      headers: getAuthHeaders()
+    });
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -493,7 +541,9 @@ async function loadUserResponses(userId) {
     STATE.selectedUser = userId;
     
     // First, get all questions to have their types available
-    const questionsResponse = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`);
+    const questionsResponse = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
+      headers: getAuthHeaders()
+    });
     if (!questionsResponse.ok) {
       throw new Error(`HTTP error getting questions! status: ${questionsResponse.status}`);
     }
@@ -512,7 +562,9 @@ async function loadUserResponses(userId) {
     });
     
     // Now get the user's responses
-    const response = await fetch(`${API_CONFIG.BASE_URL}/responses/user/${userId}`);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/responses/user/${userId}`, {
+      headers: getAuthHeaders()
+    });
     if (!response.ok) {
       throw new Error(`HTTP error getting responses! status: ${response.status}`);
     }
@@ -663,16 +715,19 @@ async function loadUserResponses(userId) {
  */
 async function loadAllResponses() {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/responses`);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/responses/pareto`, {
+      headers: getAuthHeaders()
+    });
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    STATE.allResponses = await response.json();
-    analyzeKeywords();
+    const keywordData = await response.json();
+    
+    renderParetoChart(keywordData);
   } catch (error) {
-    showError(`Error loading responses for analytics: ${error.message}`);
+    showError(`Error loading Pareto data: ${error.message}`);
   }
 }
 
