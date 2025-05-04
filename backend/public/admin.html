@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Sentiment Survey - Admin</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background-color: #f1f1f1;
+      margin-right: 5px;
+      border-radius: 5px 5px 0 0;
+    }
+    .tab.active {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 10px;
+    }
+    .form-group input[type="text"], .form-group select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+    }
+    .form-group input[type="checkbox"] {
+      margin-right: 10px;
+    }
+    .form-group .checkbox-label {
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+    .option-container {
+      margin-top: 10px;
+    }
+    .option-row {
+      display: flex;
+      margin-bottom: 5px;
+    }
+    .option-row input {
+      flex-grow: 1;
+      margin-right: 5px;
+    }
+    .option-row button {
+      margin: 0;
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+    .keyword-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .keyword-badge {
+      background-color: #9c27b0;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+    }
+    .keyword-badge button {
+      background: none;
+      border: none;
+      color: white;
+      margin-left: 5px;
+      padding: 0 5px;
+      cursor: pointer;
+    }
+    .chart-container {
+      height: 300px;
+      position: relative;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="language-toggle">
+    <label for="language-select">Language:</label>
+    <select id="language-select">
+      <option value="en">English</option>
+      <option value="es">Español (MX)</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>Employee Sentiment Survey - Admin Panel</h1>
+    </header>
+    
+    <main>
+      <div class="tabs">
+        <div class="tab active" data-tab="questions">Questions</div>
+        <div class="tab" data-tab="responses">User Responses</div>
+        <div class="tab" data-tab="analytics">Analytics</div>
+      </div>
+      
+      <!-- Questions Tab -->
+      <div class="tab-content active" id="questions-tab">
+        <h2>Create New Question</h2>
+        <form id="question-form">
+          <div class="form-group">
+            <label for="question-text">Question Text:</label>
+            <input type="text" id="question-text" maxlength="100" required />
+          </div>
+          <div class="form-group">
+            <label for="question-type">Question Type:</label>
+            <select id="question-type">
+              <option value="text">Text Response</option>
+              <option value="multipleChoice">Multiple Choice</option>
+            </select>
+          </div>
+          <div id="options-container" style="display: none;">
+            <h3>Options (max 3)</h3>
+            <div class="option-container">
+              <div class="option-row">
+                <input type="text" class="option-input" placeholder="Option 1" />
+              </div>
+              <div class="option-row">
+                <input type="text" class="option-input" placeholder="Option 2" />
+              </div>
+              <div class="option-row">
+                <input type="text" class="option-input" placeholder="Option 3" />
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="is-active" class="checkbox-label">
+              <input type="checkbox" id="is-active" checked />
+              Active
+            </label>
+          </div>
+          <button type="submit">Create Question</button>
+        </form>
+        
+        <h2>Existing Questions</h2>
+        <div id="questions-list"></div>
+      </div>
+      
+      <!-- Responses Tab -->
+      <div class="tab-content" id="responses-tab">
+        <h2>User Responses</h2>
+        <div id="users-list" class="user-list"></div>
+        <div id="user-responses"></div>
+      </div>
+      
+      <!-- Analytics Tab -->
+      <div class="tab-content" id="analytics-tab">
+        <h2>Pareto Analysis</h2>
+        <p>Analyze frequency of keywords in all responses</p>
+        
+        <div class="form-group">
+          <input type="text" id="new-keyword" placeholder="Add new keyword..." />
+          <button id="add-keyword">Add Keyword</button>
+        </div>
+        
+        <div id="keywords-list" class="keyword-container">
+          <!-- Default keywords -->
+          <div class="keyword-badge" data-keyword="good">
+            good <button class="remove-keyword">×</button>
+          </div>
+          <div class="keyword-badge" data-keyword="bad">
+            bad <button class="remove-keyword">×</button>
+          </div>
+          <div class="keyword-badge" data-keyword="improve">
+            improve <button class="remove-keyword">×</button>
+          </div>
+          <div class="keyword-badge" data-keyword="issue">
+            issue <button class="remove-keyword">×</button>
+          </div>
+          <div class="keyword-badge" data-keyword="problem">
+            problem <button class="remove-keyword">×</button>
+          </div>
+        </div>
+        
+        <div id="keyword-analysis">
+          <h3>Pareto Chart</h3>
+          <div id="chart-container" class="chart-container">
+            <canvas id="pareto-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/translations.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

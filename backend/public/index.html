@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Sentiment Survey</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .language-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .language-toggle select {
+      padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <div class="language-toggle">
+    <label for="language-select">Language:</label>
+    <select id="language-select">
+      <option value="en">English</option>
+      <option value="es">Español (MX)</option>
+    </select>
+  </div>
+  <div class="container">
+    <header>
+      <h1>Employee Sentiment Survey</h1>
+      <div class="status-message">
+        <p><strong>Status:</strong> Frontend successfully loaded! If you see this message, the static file serving is working correctly.</p>
+      </div>
+      <div class="admin-link">
+        <a href="/admin.html">Admin Panel</a>
+      </div>
+    </header>
+    <main>
+      <form id="survey-form">
+        <div class="form-group">
+          <label for="userId">User ID:</label>
+          <input type="text" id="userId" name="userId" required />
+        </div>
+        <div id="questions"></div>
+        <button type="submit">Submit</button>
+      </form>
+    </main>
+  </div>
+  <script src="/translations.js"></script>
+  <script src="/script.js"></script>
+</body>
+</html>
