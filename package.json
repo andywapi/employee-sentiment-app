@@ -1,0 +1,13 @@
+{
+  "name": "employee-sentiment-app",
+  "version": "1.0.0",
+  "description": "Employee Sentiment App with Express backend",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "cd backend && node server.js",
+    "install": "cd backend && npm install"
+  },
+  "engines": {
+    "node": "16.x"
+  }
+}
