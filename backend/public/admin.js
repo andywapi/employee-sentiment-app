@@ -1188,6 +1188,18 @@ async function loadSentimentCharts() {
  */
 function createQuestionChart(question, canvas) {
   try {
+    // Create a container for the chart and tooltip
+    const container = canvas.parentElement;
+    container.classList.add('chart-container');
+    
+    // Create tooltip element if it doesn't exist
+    let tooltip = container.querySelector('.chart-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'chart-tooltip';
+      container.appendChild(tooltip);
+    }
+    
     // Count responses for each option
     const optionCounts = {};
     
@@ -1236,6 +1248,9 @@ function createQuestionChart(question, canvas) {
     // Draw bars
     const barWidth = chartWidth / optionLabels.length;
     
+    // Store tooltip data for mouseover events
+    const tooltipAreas = [];
+    
     optionLabels.forEach((option, index) => {
       const count = optionCounts[option];
       const barHeight = (count / maxCount) * chartHeight;
@@ -1262,6 +1277,21 @@ function createQuestionChart(question, canvas) {
       
       // Draw count on top of bar
       ctx.fillText(count, x + barWidth / 2, y - 5);
+      
+      // Store tooltip area data
+      tooltipAreas.push({
+        x: x,
+        y: y,
+        width: barWidth - 10,
+        height: barHeight,
+        option: option,
+        count: count,
+        // Also include the label area at the bottom
+        labelX: x,
+        labelY: canvas.height - padding,
+        labelWidth: barWidth - 10,
+        labelHeight: 20
+      });
     });
     
     // Draw y-axis labels
@@ -1279,7 +1309,55 @@ function createQuestionChart(question, canvas) {
     // Add title
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px Arial';
-    ctx.fillText('Response Distribution', canvas.width / 2, 20);
+    ctx.fillText(translations[STATE.currentLanguage].responseDistribution || 'Response Distribution', canvas.width / 2, 20);
+    
+    // Add mousemove event listener to canvas
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Check if mouse is over any bar or label
+      let hoveredArea = null;
+      for (const area of tooltipAreas) {
+        // Check if mouse is over the bar
+        if (
+          mouseX >= area.x && 
+          mouseX <= area.x + area.width && 
+          mouseY >= area.y && 
+          mouseY <= area.y + area.height
+        ) {
+          hoveredArea = area;
+          break;
+        }
+        
+        // Check if mouse is over the label area
+        if (
+          mouseX >= area.labelX && 
+          mouseX <= area.labelX + area.labelWidth && 
+          mouseY >= area.labelY && 
+          mouseY <= area.labelY + area.labelHeight
+        ) {
+          hoveredArea = area;
+          break;
+        }
+      }
+      
+      if (hoveredArea) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX - rect.left + 10}px`;
+        tooltip.style.top = `${e.clientY - rect.top - 30}px`;
+        tooltip.textContent = `${hoveredArea.option}: ${hoveredArea.count} ${translations[STATE.currentLanguage].responses || 'responses'}`;
+      } else {
+        tooltip.style.display = 'none';
+      }
+    });
+    
+    // Hide tooltip when mouse leaves canvas
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
+    
   } catch (error) {
     console.error('Error in createQuestionChart:', error);
     // Draw error message on canvas
@@ -1300,18 +1378,37 @@ function createQuestionChart(question, canvas) {
  */
 function createSentimentChart(question, sentiments, canvas) {
   try {
-    if (!sentiments || sentiments.length === 0) {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#9E9E9E';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('No data available for sentiment analysis', canvas.width / 2, canvas.height / 2);
-      return;
+    // Create a container for the chart and tooltip
+    const container = canvas.parentElement;
+    container.classList.add('chart-container');
+    
+    // Create tooltip element if it doesn't exist
+    let tooltip = container.querySelector('.chart-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.className = 'chart-tooltip';
+      container.appendChild(tooltip);
     }
     
+    // Count sentiments by category
+    const sentimentCounts = {
+      'very positive': 0,
+      'positive': 0,
+      'neutral': 0,
+      'negative': 0,
+      'very negative': 0
+    };
+    
+    // Count the sentiments
+    sentiments.forEach(sentiment => {
+      if (sentimentCounts[sentiment.category] !== undefined) {
+        sentimentCounts[sentiment.category]++;
+      }
+    });
+    
+    // Prepare data for the chart
     const ctx = canvas.getContext('2d');
-    const padding = 50;
+    const padding = 40;
     const chartWidth = canvas.width - padding * 2;
     const chartHeight = canvas.height - padding * 2;
     
@@ -1325,26 +1422,34 @@ function createSentimentChart(question, sentiments, canvas) {
     ctx.lineTo(canvas.width - padding, canvas.height - padding);
     ctx.stroke();
     
-    // Group sentiments by category
-    const categories = ['very positive', 'positive', 'neutral', 'negative', 'very negative'];
-    const colors = ['#4CAF50', '#8BC34A', '#9E9E9E', '#FF9800', '#F44336'];
-    
-    const sentimentCounts = categories.map(category => {
-      return sentiments.filter(sentiment => sentiment.label === category).length;
-    });
+    // Get categories and counts
+    const categories = Object.keys(sentimentCounts);
+    const counts = Object.values(sentimentCounts);
+    const maxCount = Math.max(...counts, 1); // Ensure we don't divide by zero
     
     // Draw bars
     const barWidth = chartWidth / categories.length;
-    const maxCount = Math.max(...sentimentCounts, 1);
+    
+    // Define colors for sentiment categories
+    const colors = {
+      'very positive': '#4CAF50', // Green
+      'positive': '#8BC34A',      // Light Green
+      'neutral': '#FFC107',       // Yellow
+      'negative': '#FF9800',      // Orange
+      'very negative': '#F44336'  // Red
+    };
+    
+    // Store tooltip data for mouseover events
+    const tooltipAreas = [];
     
     categories.forEach((category, index) => {
-      const count = sentimentCounts[index];
+      const count = sentimentCounts[category];
       const barHeight = (count / maxCount) * chartHeight;
       const x = padding + index * barWidth;
       const y = canvas.height - padding - barHeight;
       
       // Draw bar
-      ctx.fillStyle = colors[index];
+      ctx.fillStyle = colors[category];
       ctx.fillRect(x, y, barWidth - 10, barHeight);
       
       // Draw category label
@@ -1357,10 +1462,31 @@ function createSentimentChart(question, sentiments, canvas) {
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ');
       
+      // Truncate if too long
+      if (displayCategory.length > 12) {
+        displayCategory = displayCategory.substring(0, 9) + '...';
+      }
+      
       ctx.fillText(displayCategory, x + barWidth / 2, canvas.height - padding + 15);
       
       // Draw count on top of bar
       ctx.fillText(count, x + barWidth / 2, y - 5);
+      
+      // Store tooltip area data
+      tooltipAreas.push({
+        x: x,
+        y: y,
+        width: barWidth - 10,
+        height: barHeight,
+        category: category,
+        displayCategory: displayCategory,
+        count: count,
+        // Also include the label area at the bottom
+        labelX: x,
+        labelY: canvas.height - padding,
+        labelWidth: barWidth - 10,
+        labelHeight: 20
+      });
     });
     
     // Draw y-axis labels
@@ -1378,7 +1504,54 @@ function createSentimentChart(question, sentiments, canvas) {
     // Add title
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px Arial';
-    ctx.fillText('Sentiment Distribution', canvas.width / 2, 20);
+    ctx.fillText(translations[STATE.currentLanguage].sentimentDistribution || 'Sentiment Distribution', canvas.width / 2, 20);
+    
+    // Add mousemove event listener to canvas
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Check if mouse is over any bar or label
+      let hoveredArea = null;
+      for (const area of tooltipAreas) {
+        // Check if mouse is over the bar
+        if (
+          mouseX >= area.x && 
+          mouseX <= area.x + area.width && 
+          mouseY >= area.y && 
+          mouseY <= area.y + area.height
+        ) {
+          hoveredArea = area;
+          break;
+        }
+        
+        // Check if mouse is over the label area
+        if (
+          mouseX >= area.labelX && 
+          mouseX <= area.labelX + area.labelWidth && 
+          mouseY >= area.labelY && 
+          mouseY <= area.labelY + area.labelHeight
+        ) {
+          hoveredArea = area;
+          break;
+        }
+      }
+      
+      if (hoveredArea) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX - rect.left + 10}px`;
+        tooltip.style.top = `${e.clientY - rect.top - 30}px`;
+        tooltip.textContent = `${hoveredArea.displayCategory}: ${hoveredArea.count} ${translations[STATE.currentLanguage].responses || 'responses'}`;
+      } else {
+        tooltip.style.display = 'none';
+      }
+    });
+    
+    // Hide tooltip when mouse leaves canvas
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
   } catch (error) {
     console.error('Error in createSentimentChart:', error);
     // Draw error message on canvas
