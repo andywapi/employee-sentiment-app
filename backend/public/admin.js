@@ -16,7 +16,9 @@ const STATE = {
   currentLanguage: localStorage.getItem('language') || 'en',
   allResponses: [],
   allQuestions: [],
-  selectedUser: null
+  selectedUser: null,
+  weatherData: null,
+  temperatureUnit: localStorage.getItem('temperatureUnit') || 'C' // Default to Celsius
 };
 
 // DOM Elements
@@ -44,7 +46,10 @@ const DOM = {
   userResponses: document.getElementById('user-responses'),
   
   // Analytics elements
-  chartsContainer: document.getElementById('charts-container')
+  chartsContainer: document.getElementById('charts-container'),
+  
+  // Weather display
+  weatherDisplay: document.getElementById('weather-display')
 };
 
 /**
@@ -102,6 +107,9 @@ function init() {
   loadAllResponses();
   loadQuestionCharts(); // Load multiple choice question charts
   loadSentimentCharts(); // Load sentiment analysis charts for text questions
+  
+  // Get weather data
+  getWeatherData();
 }
 
 /**
@@ -137,6 +145,16 @@ function setupEventListeners() {
         loadSentimentCharts(); // Load sentiment analysis charts for text questions
       }
     });
+  });
+  
+  // Weather display click for temperature unit toggle
+  DOM.weatherDisplay.addEventListener('click', () => {
+    // Toggle between Celsius and Fahrenheit
+    STATE.temperatureUnit = STATE.temperatureUnit === 'C' ? 'F' : 'C';
+    // Save preference
+    localStorage.setItem('temperatureUnit', STATE.temperatureUnit);
+    // Update display
+    updateWeatherDisplay();
   });
   
   // Question type change
@@ -204,6 +222,11 @@ function updateLanguage() {
   // Update analytics tab
   document.querySelector('#analytics-tab h2').textContent = 
     translations[STATE.currentLanguage].questionCharts;
+  
+  // Update weather display if data is available
+  if (STATE.weatherData) {
+    updateWeatherDisplay();
+  }
   
   // Reload data for the active tab
   const activeTab = document.querySelector('.tab.active').dataset.tab;
@@ -1182,6 +1205,89 @@ async function loadSentimentCharts() {
 }
 
 /**
+ * Get weather data based on user's IP geolocation
+ */
+async function getWeatherData() {
+  try {
+    // First, get the user's IP address
+    const ipResponse = await fetch('https://api.ipify.org?format=json');
+    const ipData = await ipResponse.json();
+    const userIp = ipData.ip;
+    
+    // Then, get geolocation data from the IP
+    const geoResponse = await fetch(`https://ipapi.co/${userIp}/json/`);
+    const geoData = await geoResponse.json();
+    
+    // Finally, get weather data for the location
+    // Using a free weather API that doesn't require an API key for development
+    const weatherResponse = await fetch(`https://wttr.in/${geoData.city}?format=j1`);
+    const weatherData = await weatherResponse.json();
+    
+    // Store weather data in state
+    STATE.weatherData = {
+      temperature_C: weatherData.current_condition[0].temp_C,
+      temperature_F: weatherData.current_condition[0].temp_F,
+      condition: weatherData.current_condition[0].weatherDesc[0].value,
+      city: geoData.city
+    };
+    
+    // Update the weather display
+    updateWeatherDisplay();
+  } catch (error) {
+    console.error('Error fetching weather data:', error);
+    // Show a fallback message
+    DOM.weatherDisplay.innerHTML = `
+      <span class="icon">🌡️</span>
+      <span class="temp">Weather unavailable</span>
+    `;
+  }
+}
+
+/**
+ * Update the weather display with the fetched data
+ */
+function updateWeatherDisplay() {
+  if (!STATE.weatherData) return;
+  
+  // Get weather icon based on condition
+  let weatherIcon = '🌡️'; // Default icon
+  const condition = STATE.weatherData.condition.toLowerCase();
+  
+  if (condition.includes('sun') || condition.includes('clear')) {
+    weatherIcon = '☀️';
+  } else if (condition.includes('cloud')) {
+    weatherIcon = '☁️';
+  } else if (condition.includes('rain') || condition.includes('drizzle')) {
+    weatherIcon = '🌧️';
+  } else if (condition.includes('snow')) {
+    weatherIcon = '❄️';
+  } else if (condition.includes('thunder') || condition.includes('storm')) {
+    weatherIcon = '⛈️';
+  } else if (condition.includes('fog') || condition.includes('mist')) {
+    weatherIcon = '🌫️';
+  }
+  
+  // Get temperature in the current unit
+  const temperature = STATE.temperatureUnit === 'C' 
+    ? STATE.weatherData.temperature_C 
+    : STATE.weatherData.temperature_F;
+  
+  // Update the DOM
+  DOM.weatherDisplay.innerHTML = `
+    <span class="icon">${weatherIcon}</span>
+    <span class="temp">${temperature}°${STATE.temperatureUnit} ${STATE.weatherData.city}</span>
+  `;
+  
+  // Add title attribute for tooltip
+  DOM.weatherDisplay.title = STATE.currentLanguage === 'en' 
+    ? 'Click to toggle between °C and °F' 
+    : 'Haga clic para cambiar entre °C y °F';
+  
+  // Add cursor style to indicate it's clickable
+  DOM.weatherDisplay.style.cursor = 'pointer';
+}
+
+/**
  * Create a chart for a specific multiple choice question
  * @param {Object} question - The question object
  * @param {HTMLCanvasElement} canvas - The canvas element to draw the chart on
@@ -1357,7 +1463,6 @@ function createQuestionChart(question, canvas) {
     canvas.addEventListener('mouseleave', () => {
       tooltip.style.display = 'none';
     });
-    
   } catch (error) {
     console.error('Error in createQuestionChart:', error);
     // Draw error message on canvas
