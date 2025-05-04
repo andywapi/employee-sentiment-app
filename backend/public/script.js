@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // API configuration
   const API_CONFIG = {
     BASE_URL: window.location.origin + '/api',
-    WEATHER_API: 'https://api.weatherapi.com/v1/current.json?key=YOUR_API_KEY&q='
+    WEATHER_API: window.location.origin + '/api/weather' // Changed to use our backend as a proxy
   };
   
   // State management
@@ -458,8 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             const { latitude, longitude } = position.coords;
             
-            // Fetch weather data from API
-            const response = await fetch(`${API_CONFIG.WEATHER_API}${latitude},${longitude}`);
+            // Fetch weather data from our backend proxy instead of directly from the weather API
+            const response = await fetch(`${API_CONFIG.WEATHER_API}?lat=${latitude}&lon=${longitude}`, {
+              headers: getAuthHeaders()
+            });
             
             if (!response.ok) {
               throw new Error('Weather API error');
@@ -469,17 +471,18 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Save weather data to state
             STATE.weatherData = {
-              location: data.location.name,
-              tempC: data.current.temp_c,
-              tempF: data.current.temp_f,
-              condition: data.current.condition.text,
-              icon: data.current.condition.icon
+              location: data.location?.name || 'Unknown',
+              tempC: data.current?.temp_c || 0,
+              tempF: data.current?.temp_f || 32,
+              condition: data.current?.condition?.text || 'Unknown',
+              icon: data.current?.condition?.icon || ''
             };
             
             // Update weather display
             updateWeatherDisplay();
           } catch (error) {
             console.error('Error fetching weather:', error);
+            // Show a more user-friendly error message
             DOM.weatherDisplay.innerHTML = `
               <div class="weather-error">
                 <i class="weather-icon">🌦️</i>
@@ -496,10 +499,15 @@ document.addEventListener('DOMContentLoaded', () => {
               <span>${STATE.currentLanguage === 'en' ? 'Location access denied' : 'Acceso a ubicación denegado'}</span>
             </div>
           `;
-        }
+        },
+        { timeout: 10000 } // Add a timeout to prevent long waits
       );
     } catch (error) {
       console.error('Weather feature error:', error);
+      // Ensure the weather display doesn't break the rest of the app
+      if (DOM.weatherDisplay) {
+        DOM.weatherDisplay.innerHTML = '';
+      }
     }
   }
   
@@ -516,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     DOM.weatherDisplay.innerHTML = `
       <div class="weather-container">
-        <img src="${icon}" alt="${condition}" class="weather-icon" />
+        ${icon ? `<img src="${icon}" alt="${condition}" class="weather-icon" />` : '<span class="weather-icon">🌤️</span>'}
         <div class="weather-info">
           <div class="weather-location">${location}</div>
           <div class="weather-temp">${Math.round(temp)}°${unit}</div>
