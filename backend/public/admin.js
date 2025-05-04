@@ -717,7 +717,7 @@ async function loadQuestionCharts() {
     }
     
     // Fetch all questions if not already loaded
-    if (!STATE.allQuestions || STATE.allQuestions.length === 0) {
+    if (!STATE.allQuestions || !Array.isArray(STATE.allQuestions) || STATE.allQuestions.length === 0) {
       const questionsResponse = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
         headers: getAuthHeaders()
       });
@@ -726,11 +726,16 @@ async function loadQuestionCharts() {
         throw new Error(`HTTP error! status: ${questionsResponse.status}`);
       }
       
-      STATE.allQuestions = await questionsResponse.json();
+      const data = await questionsResponse.json();
+      
+      // Ensure we have an array
+      STATE.allQuestions = Array.isArray(data) ? data : [];
+      
+      console.log('Loaded questions:', STATE.allQuestions);
     }
     
     // Fetch all responses if not already loaded
-    if (!STATE.allResponses || STATE.allResponses.length === 0) {
+    if (!STATE.allResponses || !Array.isArray(STATE.allResponses) || STATE.allResponses.length === 0) {
       const responsesResponse = await fetch(`${API_CONFIG.BASE_URL}/responses`, {
         headers: getAuthHeaders()
       });
@@ -739,13 +744,26 @@ async function loadQuestionCharts() {
         throw new Error(`HTTP error! status: ${responsesResponse.status}`);
       }
       
-      STATE.allResponses = await responsesResponse.json();
+      const data = await responsesResponse.json();
+      
+      // Ensure we have an array
+      STATE.allResponses = Array.isArray(data) ? data : [];
+      
+      console.log('Loaded responses:', STATE.allResponses);
+    }
+    
+    // Ensure we have arrays before filtering
+    if (!Array.isArray(STATE.allQuestions)) {
+      console.error('STATE.allQuestions is not an array:', STATE.allQuestions);
+      STATE.allQuestions = [];
     }
     
     // Filter for multiple choice questions only
     const multipleChoiceQuestions = STATE.allQuestions.filter(q => 
-      q.questionType === 'multipleChoice' && q.options && q.options.length > 0
+      q && q.questionType === 'multipleChoice' && q.options && Array.isArray(q.options) && q.options.length > 0
     );
+    
+    console.log('Multiple choice questions:', multipleChoiceQuestions);
     
     if (multipleChoiceQuestions.length === 0) {
       questionChartsContainer.innerHTML += '<p>No multiple choice questions found.</p>';
@@ -781,6 +799,7 @@ async function loadQuestionCharts() {
     });
     
   } catch (error) {
+    console.error('Error in loadQuestionCharts:', error);
     showError(`Error loading question charts: ${error.message}`);
   }
 }
@@ -791,89 +810,109 @@ async function loadQuestionCharts() {
  * @param {HTMLCanvasElement} canvas - The canvas element to draw the chart on
  */
 function createQuestionChart(question, canvas) {
-  // Count responses for each option
-  const optionCounts = {};
-  question.options.forEach(option => {
-    optionCounts[option] = 0;
-  });
-  
-  // Count the responses
-  STATE.allResponses.forEach(response => {
-    if (response.questionId === question._id && response.selectedOption) {
-      if (optionCounts[response.selectedOption] !== undefined) {
-        optionCounts[response.selectedOption]++;
+  try {
+    // Count responses for each option
+    const optionCounts = {};
+    
+    // Ensure options is an array
+    const options = Array.isArray(question.options) ? question.options : [];
+    
+    options.forEach(option => {
+      optionCounts[option] = 0;
+    });
+    
+    // Ensure allResponses is an array
+    const responses = Array.isArray(STATE.allResponses) ? STATE.allResponses : [];
+    
+    // Count the responses
+    responses.forEach(response => {
+      if (response && response.questionId === question._id && response.selectedOption) {
+        if (optionCounts[response.selectedOption] !== undefined) {
+          optionCounts[response.selectedOption]++;
+        }
       }
-    }
-  });
-  
-  // Prepare data for the chart
-  const ctx = canvas.getContext('2d');
-  const padding = 40;
-  const chartWidth = canvas.width - padding * 2;
-  const chartHeight = canvas.height - padding * 2;
-  
-  // Clear the canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // Draw axes
-  ctx.beginPath();
-  ctx.moveTo(padding, padding);
-  ctx.lineTo(padding, canvas.height - padding);
-  ctx.lineTo(canvas.width - padding, canvas.height - padding);
-  ctx.stroke();
-  
-  // Get options and counts
-  const options = Object.keys(optionCounts);
-  const counts = Object.values(optionCounts);
-  const maxCount = Math.max(...counts, 1); // Ensure we don't divide by zero
-  
-  // Draw bars
-  const barWidth = chartWidth / options.length;
-  
-  options.forEach((option, index) => {
-    const count = optionCounts[option];
-    const barHeight = (count / maxCount) * chartHeight;
-    const x = padding + index * barWidth;
-    const y = canvas.height - padding - barHeight;
+    });
     
-    // Draw bar with different colors
-    const colors = ['#4CAF50', '#2196F3', '#FF5722'];
-    ctx.fillStyle = colors[index % colors.length];
-    ctx.fillRect(x, y, barWidth - 10, barHeight);
+    console.log(`Counts for question ${question.text}:`, optionCounts);
     
-    // Draw option label
+    // Prepare data for the chart
+    const ctx = canvas.getContext('2d');
+    const padding = 40;
+    const chartWidth = canvas.width - padding * 2;
+    const chartHeight = canvas.height - padding * 2;
+    
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw axes
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, canvas.height - padding);
+    ctx.lineTo(canvas.width - padding, canvas.height - padding);
+    ctx.stroke();
+    
+    // Get options and counts
+    const optionLabels = Object.keys(optionCounts);
+    const counts = Object.values(optionCounts);
+    const maxCount = Math.max(...counts, 1); // Ensure we don't divide by zero
+    
+    // Draw bars
+    const barWidth = chartWidth / optionLabels.length;
+    
+    optionLabels.forEach((option, index) => {
+      const count = optionCounts[option];
+      const barHeight = (count / maxCount) * chartHeight;
+      const x = padding + index * barWidth;
+      const y = canvas.height - padding - barHeight;
+      
+      // Draw bar with different colors
+      const colors = ['#4CAF50', '#2196F3', '#FF5722'];
+      ctx.fillStyle = colors[index % colors.length];
+      ctx.fillRect(x, y, barWidth - 10, barHeight);
+      
+      // Draw option label
+      ctx.fillStyle = '#000';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      
+      // Truncate long option text
+      let displayOption = option;
+      if (displayOption.length > 15) {
+        displayOption = displayOption.substring(0, 12) + '...';
+      }
+      
+      ctx.fillText(displayOption, x + barWidth / 2, canvas.height - padding + 15);
+      
+      // Draw count on top of bar
+      ctx.fillText(count, x + barWidth / 2, y - 5);
+    });
+    
+    // Draw y-axis labels
     ctx.fillStyle = '#000';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'right';
     
-    // Truncate long option text
-    let displayOption = option;
-    if (displayOption.length > 15) {
-      displayOption = displayOption.substring(0, 12) + '...';
+    // Calculate appropriate y-axis intervals
+    const yAxisSteps = 5;
+    for (let i = 0; i <= yAxisSteps; i++) {
+      const value = Math.round((i / yAxisSteps) * maxCount);
+      const y = canvas.height - padding - (i / yAxisSteps) * chartHeight;
+      ctx.fillText(value, padding - 5, y + 3);
     }
     
-    ctx.fillText(displayOption, x + barWidth / 2, canvas.height - padding + 15);
-    
-    // Draw count on top of bar
-    ctx.fillText(count, x + barWidth / 2, y - 5);
-  });
-  
-  // Draw y-axis labels
-  ctx.fillStyle = '#000';
-  ctx.textAlign = 'right';
-  
-  // Calculate appropriate y-axis intervals
-  const yAxisSteps = 5;
-  for (let i = 0; i <= yAxisSteps; i++) {
-    const value = Math.round((i / yAxisSteps) * maxCount);
-    const y = canvas.height - padding - (i / yAxisSteps) * chartHeight;
-    ctx.fillText(value, padding - 5, y + 3);
+    // Add title
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText('Response Distribution', canvas.width / 2, 20);
+  } catch (error) {
+    console.error('Error in createQuestionChart:', error);
+    // Draw error message on canvas
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#FF0000';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Error rendering chart', canvas.width / 2, canvas.height / 2);
   }
-  
-  // Add title
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText('Response Distribution', canvas.width / 2, 20);
 }
 
 /**
