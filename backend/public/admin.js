@@ -7,7 +7,7 @@
 
 // API configuration
 const API_CONFIG = {
-  BASE_URL: window.location.origin + '/api'
+  BASE_URL: '/api'
 };
 
 // State management
@@ -1597,20 +1597,23 @@ async function saveQuestionOrder() {
     
     console.log('Saving question order:', questions);
     
+    // Log the API URL for debugging
+    const apiUrl = '/api/questions/order'; // Use the direct endpoint
+    console.log('Using direct API URL:', apiUrl);
+    
     // Send the updated order to the server
-    const response = await fetch(`${API_CONFIG.BASE_URL}/questions/order`, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      credentials: 'include',
       body: JSON.stringify({ questions })
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Error response from server:', response.status, errorData);
+      const errorText = await response.text();
+      console.error('Error response from server:', response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
