@@ -8,7 +8,7 @@ const SurveyQuestion = require('../models/SurveyQuestion');
  */
 exports.createQuestion = async (req, res) => {
   try {
-    const { text, questionType, options } = req.body;
+    const { text, questionType, options, order } = req.body;
     
     // Input validation
     if (!text || text.trim() === '') {
@@ -25,10 +25,14 @@ exports.createQuestion = async (req, res) => {
       });
     }
     
+    // Get the count of existing questions to set a default order if not provided
+    const questionCount = await SurveyQuestion.countDocuments();
+    
     const question = new SurveyQuestion({ 
       text, 
       questionType, 
-      options: questionType === 'multipleChoice' ? options : [] 
+      options: questionType === 'multipleChoice' ? options : [],
+      order: order !== undefined ? order : questionCount + 1 // Set order based on count if not provided
     });
     
     await question.save();
@@ -64,12 +68,25 @@ exports.createQuestion = async (req, res) => {
  */
 exports.getQuestions = async (req, res) => {
   try {
-    // Get only active questions for regular users, or all questions for admin
+    console.log('Query params:', req.query);
+    
+    // Get all questions if all=true, only active questions for regular users, or all questions for admin
+    const showAll = req.query.all === 'true';
     const isAdmin = req.query.admin === 'true';
-    const filter = isAdmin ? {} : { isActive: true };
+    const filter = showAll || isAdmin ? {} : { isActive: true };
     
-    const questions = await SurveyQuestion.find(filter);
+    console.log('Using filter:', filter);
     
+    // Sort questions by order field
+    const questions = await SurveyQuestion.find(filter).sort({ order: 1 });
+    console.log(`Found ${questions.length} questions`);
+    
+    // For all=true, return just the array without the wrapper object
+    if (showAll) {
+      return res.json(questions);
+    }
+    
+    // Otherwise return the standard format
     res.json({
       success: true,
       count: questions.length,
@@ -93,7 +110,7 @@ exports.getQuestions = async (req, res) => {
 exports.updateQuestion = async (req, res) => {
   try {
     const { id } = req.params;
-    const { text, questionType, options, isActive } = req.body;
+    const { text, questionType, options, isActive, order } = req.body;
     
     // Input validation
     if (!text || text.trim() === '') {
@@ -110,14 +127,21 @@ exports.updateQuestion = async (req, res) => {
       });
     }
     
+    const updateData = { 
+      text, 
+      questionType, 
+      options: questionType === 'multipleChoice' ? options : [],
+      isActive
+    };
+    
+    // Only include order in the update if it was provided
+    if (order !== undefined) {
+      updateData.order = order;
+    }
+    
     const updatedQuestion = await SurveyQuestion.findByIdAndUpdate(
       id,
-      { 
-        text, 
-        questionType, 
-        options: questionType === 'multipleChoice' ? options : [],
-        isActive
-      },
+      updateData,
       { new: true, runValidators: true }
     );
     
@@ -155,6 +179,56 @@ exports.updateQuestion = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Server error while updating question' 
+    });
+  }
+};
+
+/**
+ * Update the order of multiple questions
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response with success message or error
+ */
+exports.updateQuestionOrder = async (req, res) => {
+  try {
+    const { questions } = req.body;
+    
+    if (!questions || !Array.isArray(questions)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request format. Expected an array of questions with id and order.'
+      });
+    }
+    
+    // Process each question update in parallel
+    const updatePromises = questions.map(item => {
+      if (!item.id || item.order === undefined) {
+        return Promise.reject(new Error('Each question must have an id and order'));
+      }
+      
+      return SurveyQuestion.findByIdAndUpdate(
+        item.id,
+        { order: item.order },
+        { new: true }
+      );
+    });
+    
+    await Promise.all(updatePromises);
+    
+    // Fetch the updated questions with their new order
+    const updatedQuestions = await SurveyQuestion.find().sort({ order: 1 });
+    
+    res.json({
+      success: true,
+      message: 'Question order updated successfully',
+      data: updatedQuestions
+    });
+  } catch (error) {
+    console.error('Error updating question order:', error.message);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating question order'
     });
   }
 };

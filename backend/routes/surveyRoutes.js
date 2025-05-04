@@ -8,6 +8,7 @@ router.post('/questions', questionController.createQuestion);
 router.get('/questions', questionController.getQuestions);
 router.put('/questions/:id', questionController.updateQuestion);
 router.delete('/questions/:id', questionController.deleteQuestion);
+router.post('/questions/order', questionController.updateQuestionOrder);
 
 // Response Routes
 router.post('/responses', responseController.submitResponse);

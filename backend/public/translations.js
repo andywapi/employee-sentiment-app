@@ -34,6 +34,11 @@ const translations = {
     option: "Option",
     existingQuestions: "Existing Questions",
     noQuestionsMessage: "No questions found. Create your first question above!",
+    reorderMode: "Reorder Questions",
+    saveOrder: "Save Order",
+    cancel: "Cancel",
+    reorderInstructions: "Drag and drop questions to reorder them, then click Save Order",
+    orderSaved: "Question order saved successfully",
     
     // Responses Tab
     userResponses: "User Responses",
@@ -107,6 +112,11 @@ const translations = {
     option: "Opción",
     existingQuestions: "Preguntas Existentes",
     noQuestionsMessage: "No se encontraron preguntas. ¡Crea tu primera pregunta arriba!",
+    reorderMode: "Reordenar Preguntas",
+    saveOrder: "Guardar Orden",
+    cancel: "Cancelar",
+    reorderInstructions: "Arrastra y suelta las preguntas para reordenarlas, luego haz clic en Guardar Orden",
+    orderSaved: "Orden de preguntas guardado exitosamente",
     
     // Responses Tab
     userResponses: "Respuestas de Usuarios",
