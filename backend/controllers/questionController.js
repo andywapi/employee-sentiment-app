@@ -64,12 +64,24 @@ exports.createQuestion = async (req, res) => {
  */
 exports.getQuestions = async (req, res) => {
   try {
-    // Get only active questions for regular users, or all questions for admin
+    console.log('Query params:', req.query);
+    
+    // Get all questions if all=true, only active questions for regular users, or all questions for admin
+    const showAll = req.query.all === 'true';
     const isAdmin = req.query.admin === 'true';
-    const filter = isAdmin ? {} : { isActive: true };
+    const filter = showAll || isAdmin ? {} : { isActive: true };
+    
+    console.log('Using filter:', filter);
     
     const questions = await SurveyQuestion.find(filter);
+    console.log(`Found ${questions.length} questions`);
     
+    // For all=true, return just the array without the wrapper object
+    if (showAll) {
+      return res.json(questions);
+    }
+    
+    // Otherwise return the standard format
     res.json({
       success: true,
       count: questions.length,

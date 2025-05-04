@@ -299,8 +299,10 @@ async function handleQuestionFormSubmit(e) {
  */
 async function loadQuestions() {
   try {
+    console.log('Loading questions from API...');
     const response = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(),
+      credentials: 'include'
     });
     
     if (!response.ok) {
@@ -315,8 +317,18 @@ async function loadQuestions() {
     }
     
     const data = await response.json();
-    renderQuestions(data.data || data);
+    console.log('Questions data received:', data);
+    
+    // Handle different response formats
+    // If data is an array, use it directly
+    // If data has a data property, use that
+    const questions = Array.isArray(data) ? data : (data.data || []);
+    console.log(`Processed ${questions.length} questions`);
+    
+    STATE.allQuestions = questions; // Store in state for other functions to use
+    renderQuestions(questions);
   } catch (error) {
+    console.error('Error in loadQuestions:', error);
     showError(`Error loading questions: ${error.message}`);
   }
 }
@@ -743,10 +755,13 @@ async function loadQuestionCharts() {
       }
       
       const data = await questionsResponse.json();
+      console.log('Questions data received:', data);
       
-      // Ensure we have an array
-      STATE.allQuestions = Array.isArray(data) ? data : [];
-      console.log(`Loaded ${STATE.allQuestions.length} questions`);
+      // Handle different response formats
+      // If data is an array, use it directly
+      // If data has a data property, use that
+      STATE.allQuestions = Array.isArray(data) ? data : (data.data || []);
+      console.log(`Processed ${STATE.allQuestions.length} questions for charts`);
     }
     
     // Fetch all responses if not already loaded
@@ -829,34 +844,42 @@ async function loadSentimentCharts() {
       analyticsTab.appendChild(sentimentChartsContainer);
     } else {
       // Clear existing charts
-      sentimentChartsContainer.innerHTML = '<h3>Sentiment Analysis for Open-Ended Questions</h3>';
+      sentimentChartsContainer.innerHTML = `<h3>${translations[STATE.currentLanguage].sentimentAnalysis || 'Sentiment Analysis for Open-Ended Questions'}</h3>`;
     }
     
     // Fetch all questions if not already loaded
     if (!STATE.allQuestions || !Array.isArray(STATE.allQuestions) || STATE.allQuestions.length === 0) {
+      console.log('Fetching all questions for sentiment analysis...');
+      
       const questionsResponse = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       });
       
       if (!questionsResponse.ok) {
+        console.error('Error fetching questions for sentiment analysis:', questionsResponse.status, questionsResponse.statusText);
         throw new Error(`HTTP error! status: ${questionsResponse.status}`);
       }
       
       const data = await questionsResponse.json();
+      console.log('Questions data received for sentiment analysis:', data);
       
-      // Ensure we have an array
-      STATE.allQuestions = Array.isArray(data) ? data : [];
-      
-      console.log('Loaded questions:', STATE.allQuestions);
+      // Handle different response formats
+      // If data is an array, use it directly
+      // If data has a data property, use that
+      STATE.allQuestions = Array.isArray(data) ? data : (data.data || []);
+      console.log(`Processed ${STATE.allQuestions.length} questions for sentiment analysis`);
     }
     
     // Fetch all responses if not already loaded
     if (!STATE.allResponses || !Array.isArray(STATE.allResponses) || STATE.allResponses.length === 0) {
       const responsesResponse = await fetch(`${API_CONFIG.BASE_URL}/responses`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       });
       
       if (!responsesResponse.ok) {
+        console.error('Error fetching responses for sentiment analysis:', responsesResponse.status, responsesResponse.statusText);
         throw new Error(`HTTP error! status: ${responsesResponse.status}`);
       }
       
@@ -864,8 +887,7 @@ async function loadSentimentCharts() {
       
       // Ensure we have an array
       STATE.allResponses = Array.isArray(data) ? data : [];
-      
-      console.log('Loaded responses:', STATE.allResponses);
+      console.log(`Loaded ${STATE.allResponses.length} responses for sentiment analysis`);
     }
     
     // Ensure we have arrays before filtering
