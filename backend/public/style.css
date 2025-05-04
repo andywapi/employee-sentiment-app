@@ -920,3 +920,154 @@ input[type="checkbox"]:checked::before {
 .btn.danger:hover {
   background-color: #d32f2f;
 }
+
+/* Subway-style Progress Indicator */
+.progress-container {
+  margin: 30px 0;
+  padding: 15px 0;
+}
+
+.subway-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 0;
+  position: relative;
+}
+
+.subway-station {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: var(--apple-light-gray);
+  border: 2px solid var(--apple-gray);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.subway-station.completed {
+  background-color: var(--apple-green);
+  border-color: var(--apple-green);
+}
+
+.subway-station.current {
+  background-color: var(--apple-blue);
+  border-color: var(--apple-blue);
+  transform: scale(1.2);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
+}
+
+.station-number {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--apple-black);
+}
+
+.subway-station.completed .station-number,
+.subway-station.current .station-number {
+  color: white;
+}
+
+.subway-line {
+  flex-grow: 1;
+  height: 4px;
+  background-color: var(--apple-light-gray);
+  position: relative;
+  z-index: 1;
+}
+
+.subway-line.completed {
+  background-color: var(--apple-green);
+}
+
+/* Navigation Buttons */
+.navigation-buttons {
+  margin: 30px 0;
+}
+
+.navigation-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.nav-button {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: var(--font-medium);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.prev-button {
+  background-color: var(--apple-light-gray);
+  color: var(--apple-black);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.prev-button:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.next-button {
+  background-color: var(--apple-blue);
+  color: white;
+}
+
+.next-button:hover:not(:disabled) {
+  background-color: #0062cc;
+}
+
+.nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* One Question at a Time Layout */
+.question {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments for subway progress */
+@media (max-width: 768px) {
+  .subway-station {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .station-number {
+    font-size: 12px;
+  }
+  
+  .subway-line {
+    height: 3px;
+  }
+  
+  .navigation-container {
+    flex-direction: row;
+    width: 100%;
+  }
+  
+  .nav-button {
+    flex: 1;
+    text-align: center;
+  }
+}
