@@ -715,7 +715,7 @@ async function loadUserResponses(userId) {
  */
 async function loadAllResponses() {
   try {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/responses/pareto`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/responses`, {
       headers: getAuthHeaders()
     });
     
@@ -723,12 +723,34 @@ async function loadAllResponses() {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    const keywordData = await response.json();
-    
-    renderParetoChart(keywordData);
+    STATE.allResponses = await response.json();
+    analyzeKeywords();
   } catch (error) {
-    showError(`Error loading Pareto data: ${error.message}`);
+    showError(`Error loading responses for analytics: ${error.message}`);
   }
+}
+
+/**
+ * Render Pareto chart from keyword data
+ * @param {Array} keywordData - Array of keyword data objects
+ */
+function renderParetoChart(keywordData) {
+  if (!keywordData || keywordData.length === 0) {
+    DOM.chartContainer.innerHTML = '<p class="no-data">No data available for analysis</p>';
+    return;
+  }
+  
+  // Clear previous chart
+  DOM.chartContainer.innerHTML = '';
+  
+  // Create canvas for chart
+  const canvas = document.createElement('canvas');
+  canvas.width = DOM.chartContainer.offsetWidth;
+  canvas.height = 400;
+  DOM.chartContainer.appendChild(canvas);
+  
+  // Display the Pareto chart
+  displayParetoChart(keywordData);
 }
 
 /**
