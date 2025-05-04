@@ -15,6 +15,7 @@ const STATE = {
   currentEditId: null,
   currentLanguage: localStorage.getItem('language') || 'en',
   allResponses: [],
+  allQuestions: [],
   selectedUser: null
 };
 
@@ -102,6 +103,7 @@ function init() {
   loadQuestions();
   loadUsers();
   loadAllResponses();
+  loadQuestionCharts();
 }
 
 /**
@@ -134,6 +136,7 @@ function setupEventListeners() {
         loadUsers();
       } else if (tabName === 'analytics') {
         analyzeKeywords();
+        loadQuestionCharts();
       }
     });
   });
@@ -740,15 +743,6 @@ function renderParetoChart(keywordData) {
     return;
   }
   
-  // Clear previous chart
-  DOM.chartContainer.innerHTML = '';
-  
-  // Create canvas for chart
-  const canvas = document.createElement('canvas');
-  canvas.width = DOM.chartContainer.offsetWidth;
-  canvas.height = 400;
-  DOM.chartContainer.appendChild(canvas);
-  
   // Display the Pareto chart
   displayParetoChart(keywordData);
 }
@@ -841,7 +835,17 @@ function analyzeKeywords() {
  * @param {Array} data - Chart data
  */
 function displayParetoChart(data) {
+  if (!data || data.length === 0) {
+    DOM.chartContainer.innerHTML = '<p class="no-data">No data available for analysis</p>';
+    return;
+  }
+  
+  // Clear and style the container
   DOM.chartContainer.innerHTML = '';
+  DOM.chartContainer.style.overflow = 'hidden'; // Prevent overflow
+  DOM.chartContainer.style.position = 'relative'; // For proper sizing
+  DOM.chartContainer.style.maxWidth = '100%'; // Ensure container doesn't overflow
+  DOM.chartContainer.style.margin = '0 auto'; // Center the chart
   
   if (data.length === 0) {
     DOM.chartContainer.textContent = translations[STATE.currentLanguage].noData || 'No data available';
@@ -854,17 +858,21 @@ function displayParetoChart(data) {
   
   // Make sure the canvas fits within its container
   const containerWidth = DOM.chartContainer.clientWidth;
-  canvas.width = Math.min(containerWidth, 800); // Cap width at 800px
-  canvas.height = 350; // Reduced height to ensure it fits
+  canvas.width = Math.min(containerWidth - 20, 700); // Cap width with some margin
+  canvas.height = 300; // Further reduced height
   canvas.style.maxWidth = '100%'; // Ensure it never exceeds container
   canvas.style.height = 'auto'; // Maintain aspect ratio
+  canvas.style.display = 'block'; // Remove inline spacing
   
   DOM.chartContainer.appendChild(canvas);
   
   const ctx = canvas.getContext('2d');
-  const padding = 40;
+  const padding = 50; // Increased padding for better spacing
   const chartWidth = canvas.width - padding * 2;
   const chartHeight = canvas.height - padding * 2;
+  
+  // Clear the entire canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   
   // Draw axes
   ctx.beginPath();
@@ -874,7 +882,7 @@ function displayParetoChart(data) {
   ctx.stroke();
   
   // Limit number of items to display if there are too many
-  const displayData = data.length > 10 ? data.slice(0, 10) : data;
+  const displayData = data.length > 8 ? data.slice(0, 8) : data; // Reduced to 8 items max
   
   // Draw bars and line
   const barWidth = chartWidth / displayData.length;
@@ -945,11 +953,195 @@ function displayParetoChart(data) {
   // Add responsive behavior
   window.addEventListener('resize', () => {
     if (DOM.chartContainer.contains(canvas)) {
-      canvas.width = Math.min(DOM.chartContainer.clientWidth, 800);
+      canvas.width = Math.min(DOM.chartContainer.clientWidth - 20, 700);
       // Redraw chart when window is resized
       displayParetoChart(data);
     }
   });
+}
+
+/**
+ * Load all questions and responses for charts
+ */
+async function loadQuestionCharts() {
+  try {
+    // Create a container for question charts if it doesn't exist
+    let questionChartsContainer = document.getElementById('question-charts-container');
+    if (!questionChartsContainer) {
+      questionChartsContainer = document.createElement('div');
+      questionChartsContainer.id = 'question-charts-container';
+      questionChartsContainer.className = 'charts-container';
+      
+      // Add a title
+      const title = document.createElement('h3');
+      title.textContent = 'Multiple Choice Question Results';
+      questionChartsContainer.appendChild(title);
+      
+      // Add the container after the Pareto chart
+      DOM.chartContainer.parentNode.insertBefore(questionChartsContainer, DOM.chartContainer.nextSibling);
+    } else {
+      // Clear existing charts
+      questionChartsContainer.innerHTML = '<h3>Multiple Choice Question Results</h3>';
+    }
+    
+    // Fetch all questions if not already loaded
+    if (!STATE.allQuestions || STATE.allQuestions.length === 0) {
+      const questionsResponse = await fetch(`${API_CONFIG.BASE_URL}/questions?all=true`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (!questionsResponse.ok) {
+        throw new Error(`HTTP error! status: ${questionsResponse.status}`);
+      }
+      
+      STATE.allQuestions = await questionsResponse.json();
+    }
+    
+    // Fetch all responses if not already loaded
+    if (!STATE.allResponses || STATE.allResponses.length === 0) {
+      const responsesResponse = await fetch(`${API_CONFIG.BASE_URL}/responses`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (!responsesResponse.ok) {
+        throw new Error(`HTTP error! status: ${responsesResponse.status}`);
+      }
+      
+      STATE.allResponses = await responsesResponse.json();
+    }
+    
+    // Filter for multiple choice questions only
+    const multipleChoiceQuestions = STATE.allQuestions.filter(q => 
+      q.questionType === 'multipleChoice' && q.options && q.options.length > 0
+    );
+    
+    if (multipleChoiceQuestions.length === 0) {
+      questionChartsContainer.innerHTML += '<p>No multiple choice questions found.</p>';
+      return;
+    }
+    
+    // Create a chart for each multiple choice question
+    multipleChoiceQuestions.forEach(question => {
+      // Create a container for this question's chart
+      const questionChartContainer = document.createElement('div');
+      questionChartContainer.className = 'question-chart';
+      questionChartContainer.style.marginBottom = '30px';
+      
+      // Add question text
+      const questionTitle = document.createElement('h4');
+      questionTitle.textContent = question.text;
+      questionChartContainer.appendChild(questionTitle);
+      
+      // Create canvas for the chart
+      const canvas = document.createElement('canvas');
+      canvas.id = `chart-question-${question._id}`;
+      canvas.style.maxWidth = '100%';
+      canvas.style.height = 'auto';
+      canvas.width = 400;
+      canvas.height = 300;
+      questionChartContainer.appendChild(canvas);
+      
+      // Add the question chart to the container
+      questionChartsContainer.appendChild(questionChartContainer);
+      
+      // Create the chart
+      createQuestionChart(question, canvas);
+    });
+    
+  } catch (error) {
+    showError(`Error loading question charts: ${error.message}`);
+  }
+}
+
+/**
+ * Create a chart for a specific multiple choice question
+ * @param {Object} question - The question object
+ * @param {HTMLCanvasElement} canvas - The canvas element to draw the chart on
+ */
+function createQuestionChart(question, canvas) {
+  // Count responses for each option
+  const optionCounts = {};
+  question.options.forEach(option => {
+    optionCounts[option] = 0;
+  });
+  
+  // Count the responses
+  STATE.allResponses.forEach(response => {
+    if (response.questionId === question._id && response.selectedOption) {
+      if (optionCounts[response.selectedOption] !== undefined) {
+        optionCounts[response.selectedOption]++;
+      }
+    }
+  });
+  
+  // Prepare data for the chart
+  const ctx = canvas.getContext('2d');
+  const padding = 40;
+  const chartWidth = canvas.width - padding * 2;
+  const chartHeight = canvas.height - padding * 2;
+  
+  // Clear the canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw axes
+  ctx.beginPath();
+  ctx.moveTo(padding, padding);
+  ctx.lineTo(padding, canvas.height - padding);
+  ctx.lineTo(canvas.width - padding, canvas.height - padding);
+  ctx.stroke();
+  
+  // Get options and counts
+  const options = Object.keys(optionCounts);
+  const counts = Object.values(optionCounts);
+  const maxCount = Math.max(...counts, 1); // Ensure we don't divide by zero
+  
+  // Draw bars
+  const barWidth = chartWidth / options.length;
+  
+  options.forEach((option, index) => {
+    const count = optionCounts[option];
+    const barHeight = (count / maxCount) * chartHeight;
+    const x = padding + index * barWidth;
+    const y = canvas.height - padding - barHeight;
+    
+    // Draw bar with different colors
+    const colors = ['#4CAF50', '#2196F3', '#FF5722'];
+    ctx.fillStyle = colors[index % colors.length];
+    ctx.fillRect(x, y, barWidth - 10, barHeight);
+    
+    // Draw option label
+    ctx.fillStyle = '#000';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    
+    // Truncate long option text
+    let displayOption = option;
+    if (displayOption.length > 15) {
+      displayOption = displayOption.substring(0, 12) + '...';
+    }
+    
+    ctx.fillText(displayOption, x + barWidth / 2, canvas.height - padding + 15);
+    
+    // Draw count on top of bar
+    ctx.fillText(count, x + barWidth / 2, y - 5);
+  });
+  
+  // Draw y-axis labels
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'right';
+  
+  // Calculate appropriate y-axis intervals
+  const yAxisSteps = 5;
+  for (let i = 0; i <= yAxisSteps; i++) {
+    const value = Math.round((i / yAxisSteps) * maxCount);
+    const y = canvas.height - padding - (i / yAxisSteps) * chartHeight;
+    ctx.fillText(value, padding - 5, y + 3);
+  }
+  
+  // Add title
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText('Response Distribution', canvas.width / 2, 20);
 }
 
 /**
