@@ -1071,3 +1071,61 @@ input[type="checkbox"]:checked::before {
     text-align: center;
   }
 }
+
+/* Confirmation page styles */
+.confirmation-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  margin: 2rem auto;
+  max-width: 600px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.confirmation-icon {
+  font-size: 4rem;
+  color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.1);
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.confirmation-message {
+  font-size: 1.8rem;
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+.new-survey-button {
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.new-survey-button:hover {
+  background-color: #0b7dda;
+}
+
+/* Style for submit button in navigation */
+.submit-button {
+  background-color: #4CAF50;
+}
+
+.submit-button:hover {
+  background-color: #45a049;
+}

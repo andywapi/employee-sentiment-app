@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     currentLanguage: localStorage.getItem('language') || 'en',
     questions: [],
     currentQuestionIndex: 0,
-    responses: new Map()
+    responses: new Map(),
+    showConfirmation: false
   };
   
   // DOM Elements
@@ -176,7 +177,8 @@ document.addEventListener('DOMContentLoaded', () => {
       renderProgressIndicator();
       renderNavigation();
       
-      DOM.submitButton.style.display = 'none'; // Hide the submit button until the last question
+      // Hide the submit button since we'll use the next button as submit on the last question
+      DOM.submitButton.style.display = 'none';
     } catch (error) {
       console.error('Error loading questions:', error);
       DOM.questionsDiv.innerHTML = `
@@ -191,6 +193,12 @@ document.addEventListener('DOMContentLoaded', () => {
    * Render the current question based on the currentQuestionIndex
    */
   function renderCurrentQuestion() {
+    // If we're showing the confirmation page, render that instead
+    if (STATE.showConfirmation) {
+      renderConfirmationPage();
+      return;
+    }
+    
     DOM.questionsDiv.innerHTML = ''; // Clear existing questions
     
     if (STATE.questions.length === 0) return;
@@ -264,13 +272,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     DOM.questionsDiv.appendChild(questionDiv);
+  }
+  
+  /**
+   * Render the confirmation page after survey submission
+   */
+  function renderConfirmationPage() {
+    // Hide progress indicator and navigation buttons when showing confirmation
+    DOM.progressIndicator.style.display = 'none';
+    DOM.navigationButtons.style.display = 'none';
     
-    // Update submit button visibility
-    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
-      DOM.submitButton.style.display = 'block';
-    } else {
-      DOM.submitButton.style.display = 'none';
-    }
+    // Create confirmation message
+    const confirmationDiv = document.createElement('div');
+    confirmationDiv.className = 'confirmation-page';
+    
+    const icon = document.createElement('div');
+    icon.className = 'confirmation-icon';
+    icon.innerHTML = '✓';
+    confirmationDiv.appendChild(icon);
+    
+    const message = document.createElement('h2');
+    message.className = 'confirmation-message';
+    message.textContent = translations[STATE.currentLanguage].confirmationMessage || 'Thank you for completing the survey';
+    confirmationDiv.appendChild(message);
+    
+    const newSurveyBtn = document.createElement('button');
+    newSurveyBtn.className = 'new-survey-button';
+    newSurveyBtn.textContent = translations[STATE.currentLanguage].startNewSurvey || 'Start a new survey';
+    newSurveyBtn.addEventListener('click', () => {
+      // Reset the form and state
+      DOM.form.reset();
+      STATE.responses = new Map();
+      STATE.currentQuestionIndex = 0;
+      STATE.showConfirmation = false;
+      
+      // Show progress indicator and navigation buttons again
+      DOM.progressIndicator.style.display = 'block';
+      DOM.navigationButtons.style.display = 'block';
+      
+      // Reload questions
+      loadQuestions();
+    });
+    confirmationDiv.appendChild(newSurveyBtn);
+    
+    // Clear questions div and add confirmation
+    DOM.questionsDiv.innerHTML = '';
+    DOM.questionsDiv.appendChild(confirmationDiv);
   }
   
   /**
@@ -328,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderNavigation() {
     DOM.navigationButtons.innerHTML = '';
     
-    if (STATE.questions.length === 0) return;
+    if (STATE.questions.length === 0 || STATE.showConfirmation) return;
     
     const navContainer = document.createElement('div');
     navContainer.className = 'navigation-container';
@@ -342,13 +389,23 @@ document.addEventListener('DOMContentLoaded', () => {
     prevButton.addEventListener('click', goToPreviousQuestion);
     navContainer.appendChild(prevButton);
     
-    // Next button
+    // Next/Submit button
     const nextButton = document.createElement('button');
     nextButton.type = 'button';
-    nextButton.className = 'nav-button next-button';
-    nextButton.textContent = STATE.currentLanguage === 'en' ? 'Next' : 'Siguiente';
-    nextButton.disabled = STATE.currentQuestionIndex === STATE.questions.length - 1;
-    nextButton.addEventListener('click', goToNextQuestion);
+    
+    // Change button text and function if it's the last question
+    const isLastQuestion = STATE.currentQuestionIndex === STATE.questions.length - 1;
+    
+    if (isLastQuestion) {
+      nextButton.className = 'nav-button submit-button';
+      nextButton.textContent = translations[STATE.currentLanguage].submit || 'Submit';
+      nextButton.addEventListener('click', handleSubmitFromNavigation);
+    } else {
+      nextButton.className = 'nav-button next-button';
+      nextButton.textContent = STATE.currentLanguage === 'en' ? 'Next' : 'Siguiente';
+      nextButton.addEventListener('click', goToNextQuestion);
+    }
+    
     navContainer.appendChild(nextButton);
     
     DOM.navigationButtons.appendChild(navContainer);
@@ -416,12 +473,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   /**
-   * Handle form submission
-   * @param {Event} e - Form submit event
+   * Handle form submission triggered from the navigation button
    */
-  async function handleFormSubmit(e) {
-    e.preventDefault();
+  async function handleSubmitFromNavigation() {
+    // Validate the current question first
+    const currentQuestion = STATE.questions[STATE.currentQuestionIndex];
+    if (!validateCurrentQuestion(currentQuestion)) {
+      return;
+    }
     
+    // Now handle the actual submission
     try {
       // Validate userId
       const userId = document.getElementById('userId').value.trim();
@@ -441,9 +502,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      // Disable submit button to prevent multiple submissions
-      DOM.submitButton.disabled = true;
-      DOM.submitButton.textContent = STATE.currentLanguage === 'en' ? 'Submitting...' : 'Enviando...';
+      // Disable navigation buttons to prevent multiple submissions
+      const navButtons = document.querySelectorAll('.nav-button');
+      navButtons.forEach(button => {
+        button.disabled = true;
+        if (button.classList.contains('submit-button')) {
+          button.textContent = STATE.currentLanguage === 'en' ? 'Submitting...' : 'Enviando...';
+        }
+      });
       
       const promises = [];
       
@@ -478,26 +544,36 @@ document.addEventListener('DOMContentLoaded', () => {
       // Wait for all responses to be submitted
       await Promise.all(promises);
       
-      // Show success message
-      showSuccess(translations[STATE.currentLanguage].responseSubmitted || 'Thank you for your feedback!');
+      // Show the confirmation page
+      STATE.showConfirmation = true;
+      renderCurrentQuestion();
       
-      // Reset form and reload questions
-      DOM.form.reset();
-      DOM.questionsDiv.innerHTML = '';
-      
-      // Reload after a short delay
-      setTimeout(() => {
-        loadQuestions();
-        DOM.submitButton.disabled = false;
-        DOM.submitButton.textContent = translations[STATE.currentLanguage].submit;
-      }, 1000);
     } catch (error) {
       console.error('Error submitting responses:', error);
       showError(translations[STATE.currentLanguage].failedToSubmit || 'Failed to submit responses. Please try again.');
       
-      // Re-enable submit button
-      DOM.submitButton.disabled = false;
-      DOM.submitButton.textContent = translations[STATE.currentLanguage].submit;
+      // Re-enable navigation buttons
+      const navButtons = document.querySelectorAll('.nav-button');
+      navButtons.forEach(button => {
+        button.disabled = false;
+        if (button.classList.contains('submit-button')) {
+          button.textContent = translations[STATE.currentLanguage].submit || 'Submit';
+        }
+      });
+    }
+  }
+
+  /**
+   * Handle form submission
+   * @param {Event} e - Form submit event
+   */
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    // We're now handling submission through the navigation buttons
+    // This is just a fallback in case the form is submitted directly
+    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
+      handleSubmitFromNavigation();
     }
   }
   

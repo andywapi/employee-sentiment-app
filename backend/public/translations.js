@@ -24,6 +24,8 @@ const translations = {
     pleaseEnterResponse: "Please enter a response before proceeding.",
     answerAllQuestions: "Please answer all questions before submitting.",
     questionProgress: "Question {current} of {total}",
+    confirmationMessage: "Thank you for completing the survey",
+    startNewSurvey: "Start a new survey",
     
     // Admin Panel
     questionsTab: "Questions",
@@ -110,6 +112,8 @@ const translations = {
     pleaseEnterResponse: "Por favor ingrese una respuesta antes de continuar.",
     answerAllQuestions: "Por favor responda todas las preguntas antes de enviar.",
     questionProgress: "Pregunta {current} de {total}",
+    confirmationMessage: "Gracias por completar la encuesta",
+    startNewSurvey: "Comenzar una nueva encuesta",
     
     // Admin Panel
     questionsTab: "Preguntas",
