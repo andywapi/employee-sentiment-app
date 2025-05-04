@@ -851,8 +851,14 @@ function displayParetoChart(data) {
   // Create chart elements
   const canvas = document.createElement('canvas');
   canvas.id = 'pareto-chart';
-  canvas.width = DOM.chartContainer.offsetWidth;
-  canvas.height = 400;
+  
+  // Make sure the canvas fits within its container
+  const containerWidth = DOM.chartContainer.clientWidth;
+  canvas.width = Math.min(containerWidth, 800); // Cap width at 800px
+  canvas.height = 350; // Reduced height to ensure it fits
+  canvas.style.maxWidth = '100%'; // Ensure it never exceeds container
+  canvas.style.height = 'auto'; // Maintain aspect ratio
+  
   DOM.chartContainer.appendChild(canvas);
   
   const ctx = canvas.getContext('2d');
@@ -867,12 +873,15 @@ function displayParetoChart(data) {
   ctx.lineTo(canvas.width - padding, canvas.height - padding);
   ctx.stroke();
   
+  // Limit number of items to display if there are too many
+  const displayData = data.length > 10 ? data.slice(0, 10) : data;
+  
   // Draw bars and line
-  const barWidth = chartWidth / data.length;
-  const maxCount = Math.max(...data.map(item => item.count));
+  const barWidth = chartWidth / displayData.length;
+  const maxCount = Math.max(...displayData.map(item => item.count));
   
   // Draw bars
-  data.forEach((item, index) => {
+  displayData.forEach((item, index) => {
     const barHeight = (item.count / maxCount) * chartHeight;
     const x = padding + index * barWidth;
     const y = canvas.height - padding - barHeight;
@@ -880,11 +889,28 @@ function displayParetoChart(data) {
     ctx.fillStyle = '#4CAF50';
     ctx.fillRect(x, y, barWidth - 5, barHeight);
     
-    // Draw keyword label
+    // Draw keyword label - handle long keywords
     ctx.fillStyle = '#000';
     ctx.font = '10px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(item.keyword, x + barWidth / 2, canvas.height - padding + 15);
+    
+    // Truncate long keywords
+    let displayKeyword = item.keyword;
+    if (displayKeyword.length > 10) {
+      displayKeyword = displayKeyword.substring(0, 8) + '...';
+    }
+    
+    // Rotate labels if there are many items
+    if (displayData.length > 5) {
+      ctx.save();
+      ctx.translate(x + barWidth / 2, canvas.height - padding + 5);
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'right';
+      ctx.fillText(displayKeyword, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(displayKeyword, x + barWidth / 2, canvas.height - padding + 15);
+    }
     
     // Draw count label
     ctx.fillText(item.count, x + barWidth / 2, y - 5);
@@ -895,7 +921,7 @@ function displayParetoChart(data) {
   ctx.strokeStyle = '#FF5722';
   ctx.lineWidth = 2;
   
-  data.forEach((item, index) => {
+  displayData.forEach((item, index) => {
     const x = padding + index * barWidth + barWidth / 2;
     const y = canvas.height - padding - (item.cumulative / 100) * chartHeight;
     
@@ -915,6 +941,15 @@ function displayParetoChart(data) {
     const y = canvas.height - padding - (i / 10) * chartHeight;
     ctx.fillText(`${i * 10}%`, padding - 5, y + 3);
   }
+  
+  // Add responsive behavior
+  window.addEventListener('resize', () => {
+    if (DOM.chartContainer.contains(canvas)) {
+      canvas.width = Math.min(DOM.chartContainer.clientWidth, 800);
+      // Redraw chart when window is resized
+      displayParetoChart(data);
+    }
+  });
 }
 
 /**
