@@ -10,6 +10,18 @@ const SurveyQuestionSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
+  text_en: {
+    type: String,
+    default: function() {
+      return this.text; // Default to the main text field
+    }
+  },
+  text_es: {
+    type: String,
+    default: function() {
+      return this.text; // Default to the main text field
+    }
+  },
   questionType: {
     type: String, 
     enum: ['text', 'multipleChoice'], 

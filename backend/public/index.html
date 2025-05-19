@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Employee Sentiment Survey</title>
   <link rel="stylesheet" href="/style.css">
+  <!-- Original scripts -->
+  <script src="/i18n.js"></script>
+  <script src="/translations.js"></script>
+  <!-- Language patch scripts -->
+  <script src="/direct-translations.js"></script>
+  <script src="/language-patch.js"></script>
   <style>
     .language-toggle {
       position: absolute;
@@ -43,20 +49,20 @@
     <span class="temp">Loading...</span>
   </div>
   <div class="language-toggle">
-    <label for="language-select">Language:</label>
+    <label for="language-select" data-i18n="languageLabel">Language:</label>
     <select id="language-select">
       <option value="en">English</option>
-      <option value="es">Español (MX)</option>
+      <option value="es">Español</option>
     </select>
   </div>
   <div class="container">
     <header>
-      <h1>Employee Sentiment Survey</h1>
+      <h1 data-i18n="appTitle">Employee Sentiment Survey</h1>
       <div class="status-message">
-        <p><strong>Status:</strong> Frontend successfully loaded! If you see this message, the static file serving is working correctly.</p>
+        <p><strong data-i18n="statusLabel">Status:</strong> <span data-i18n="statusMessage">Frontend successfully loaded! If you see this message, the static file serving is working correctly.</span></p>
       </div>
       <div class="admin-link">
-        <a href="/admin.html">Admin Panel</a>
+        <a href="/admin.html" data-i18n="adminLink">Admin Panel</a>
       </div>
     </header>
     <main>
@@ -79,7 +85,7 @@
       </form>
     </main>
   </div>
-  <script src="/translations.js"></script>
+  <!-- Original main script -->
   <script src="/script.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ const SurveyQuestion = require('../models/SurveyQuestion');
  */
 exports.createQuestion = async (req, res) => {
   try {
-    const { text, questionType, options, order } = req.body;
+    const { text, text_en, text_es, questionType, options, order } = req.body;
     
     // Input validation
     if (!text || text.trim() === '') {
@@ -28,8 +28,34 @@ exports.createQuestion = async (req, res) => {
     // Get the count of existing questions to set a default order if not provided
     const questionCount = await SurveyQuestion.countDocuments();
     
+    // Helper function to detect if text is in Spanish
+    function isSpanishText(text) {
+      return text.includes('¿') || text.includes('á') || text.includes('é') || 
+             text.includes('í') || text.includes('ó') || text.includes('ú') || 
+             text.includes('ñ');
+    }
+    
+    // Translations mapping for common questions
+    const translations = {
+      // English to Spanish
+      "How would you rate your work environment?": "¿Cómo calificaría su ambiente de trabajo?",
+      "How satisfied are you with team collaboration?": "¿Qué tan satisfecho está con la colaboración en equipo?",
+      "Do you feel supported by management?": "¿Se siente apoyado por la gerencia?",
+      // Spanish to English
+      "¿Cómo calificaría su ambiente de trabajo?": "How would you rate your work environment?",
+      "¿Qué tan satisfecho está con la colaboración en equipo?": "How satisfied are you with team collaboration?",
+      "¿Se siente apoyado por la gerencia?": "Do you feel supported by management?"
+    };
+    
+    // Determine language and set translations
+    const isSpanish = isSpanishText(text);
+    let finalTextEn = text_en || (isSpanish ? translations[text] || text : text);
+    let finalTextEs = text_es || (isSpanish ? text : translations[text] || text);
+    
     const question = new SurveyQuestion({ 
       text, 
+      text_en: finalTextEn,
+      text_es: finalTextEs,
       questionType, 
       options: questionType === 'multipleChoice' ? options : [],
       order: order !== undefined ? order : questionCount + 1 // Set order based on count if not provided

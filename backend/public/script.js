@@ -6,6 +6,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize the i18n system
+  if (window.i18n) {
+    i18n.initLanguage();
+    i18n.updatePageTranslations();
+  }
   // API configuration
   const API_CONFIG = {
     BASE_URL: window.location.origin + '/api',
@@ -74,6 +79,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check authentication
     checkAuth();
     
+    // Set up language toggle
+    const languageToggle = document.querySelector('.language-toggle');
+    if (languageToggle && window.LanguageSystem) {
+      languageToggle.addEventListener('click', function() {
+        const currentLang = LanguageSystem.getLanguage();
+        const newLang = currentLang === 'en' ? 'es' : 'en';
+        LanguageSystem.setLanguage(newLang);
+      });
+    }
+    
     // Set initial language
     DOM.languageSelect.value = STATE.currentLanguage;
     
@@ -98,7 +113,21 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.languageSelect.addEventListener('change', (e) => {
       STATE.currentLanguage = e.target.value;
       localStorage.setItem('language', STATE.currentLanguage);
-      updateLanguage();
+      
+      // Update language in our simple language system
+      if (window.SimpleLanguage) {
+        SimpleLanguage.setLanguage(STATE.currentLanguage);
+        
+        // Update all UI elements with new translations
+        setTimeout(() => {
+          SimpleLanguage.updateUI();
+          console.log(`Language changed to ${STATE.currentLanguage} via select dropdown`);
+        }, 10);
+      }
+      
+      // Re-render the current question to update translations
+      renderCurrentQuestion();
+      renderNavigation();
     });
     
     // Form submission
@@ -121,26 +150,39 @@ document.addEventListener('DOMContentLoaded', () => {
    * Update all text elements with translations
    */
   function updateLanguage() {
-    // Update title
-    document.title = translations[STATE.currentLanguage].appTitle;
-    
-    // Update heading
-    document.querySelector('h1').textContent = translations[STATE.currentLanguage].surveyTitle;
-    
-    // Update language toggle
-    document.querySelector('.language-toggle label').textContent = 
-      STATE.currentLanguage === 'en' ? 'Language:' : 'Idioma:';
-    
-    // Update status message
-    const statusP = document.querySelector('.status-message p');
-    if (statusP) {
-      statusP.innerHTML = `<strong>${STATE.currentLanguage === 'en' ? 'Status' : 'Estado'}:</strong> ${translations[STATE.currentLanguage].statusMessage || 'Frontend successfully loaded!'}`;
-    }
-    
-    // Update admin panel link
-    const adminLink = document.querySelector('a[href="/admin.html"]');
-    if (adminLink) {
-      adminLink.textContent = translations[STATE.currentLanguage].adminPanel;
+    // Use our new i18n system if available
+    if (window.i18n) {
+      // Set the language in our i18n system
+      i18n.setLanguage(STATE.currentLanguage);
+      
+      // Update all translatable elements
+      i18n.updatePageTranslations();
+      
+      // Update document title
+      document.title = i18n.translate('appTitle');
+    } else {
+      // Fallback to the old translation system
+      // Update title
+      document.title = translations[STATE.currentLanguage].appTitle;
+      
+      // Update heading
+      document.querySelector('h1').textContent = translations[STATE.currentLanguage].surveyTitle;
+      
+      // Update language toggle
+      document.querySelector('.language-toggle label').textContent = 
+        STATE.currentLanguage === 'en' ? 'Language:' : 'Idioma:';
+      
+      // Update status message
+      const statusP = document.querySelector('.status-message p');
+      if (statusP) {
+        statusP.innerHTML = `<strong>${STATE.currentLanguage === 'en' ? 'Status' : 'Estado'}:</strong> ${translations[STATE.currentLanguage].statusMessage || 'Frontend successfully loaded!'}`;
+      }
+      
+      // Update admin panel link
+      const adminLink = document.querySelector('a[href="/admin.html"]');
+      if (adminLink) {
+        adminLink.textContent = translations[STATE.currentLanguage].adminPanel;
+      }
     }
     
     // Update form elements
@@ -199,6 +241,14 @@ document.addEventListener('DOMContentLoaded', () => {
       renderProgressIndicator();
       renderNavigation();
       
+      // Apply translations after questions are loaded
+      if (window.SimpleLanguage) {
+        setTimeout(() => {
+          SimpleLanguage.updateUI();
+          console.log('Applied translations after questions loaded');
+        }, 50);
+      }
+      
       // Hide the submit button since we'll use the next button as submit on the last question
       DOM.submitButton.style.display = 'none';
     } catch (error) {
@@ -209,6 +259,61 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
     }
+  }
+  
+  /**
+   * Synchronize the language of all form elements
+   * This ensures that all elements use the same language
+   */
+  function synchronizeFormLanguage() {
+    if (!window.i18n) return;
+    
+    console.log(`Synchronizing form language to: ${STATE.currentLanguage}`);
+    
+    // Update all question texts
+    document.querySelectorAll('.question-label').forEach(label => {
+      const questionText = label.textContent;
+      const translatedText = i18n.translateQuestion(questionText);
+      label.textContent = translatedText;
+    });
+    
+    // Update all placeholders
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+      const key = element.getAttribute('data-i18n-placeholder');
+      element.placeholder = i18n.translate(key);
+    });
+    
+    // Update navigation buttons
+    const prevButton = document.querySelector('.prev-button');
+    if (prevButton) {
+      prevButton.textContent = i18n.translate('prevButton');
+    }
+    
+    const nextButton = document.querySelector('.next-button');
+    if (nextButton) {
+      nextButton.textContent = i18n.translate('nextButton');
+    }
+    
+    // Update user ID label
+    const userIdLabel = document.querySelector('label[for="userId"]');
+    if (userIdLabel) {
+      userIdLabel.textContent = STATE.currentLanguage === 'en' ? 'User ID:' : 'ID de Usuario:';
+    }
+  }
+  
+  /**
+   * Directly translate a question based on the current language
+   * @param {string} questionText - The original question text
+   * @returns {string} The translated question text
+   */
+  function directTranslateQuestion(questionText) {
+    // Use our simple language system if available
+    if (window.SimpleLanguage) {
+      return SimpleLanguage.translateQuestion(questionText);
+    }
+    
+    // Fallback to original text
+    return questionText;
   }
   
   /**
@@ -232,10 +337,27 @@ document.addEventListener('DOMContentLoaded', () => {
     questionDiv.dataset.id = question._id;
     questionDiv.dataset.type = question.questionType;
     
+    // Store the original question text as a data attribute for translation purposes
+    questionDiv.dataset.originalText = question.text;
+    
     // Create question label
     const questionLabel = document.createElement('p');
     questionLabel.className = 'question-label';
-    questionLabel.textContent = question.text;
+    questionLabel.dataset.originalText = question.text;
+    questionLabel.dataset.englishText = question.text_en || question.text;
+    questionLabel.dataset.spanishText = question.text_es || question.text;
+    
+    // Use the appropriate language version based on the current language
+    if (STATE.currentLanguage === 'es') {
+      // Use Spanish version if available
+      questionLabel.textContent = question.text_es || question.text;
+      console.log(`Using Spanish text: "${questionLabel.textContent}"`);
+    } else {
+      // Use English version if available
+      questionLabel.textContent = question.text_en || question.text;
+      console.log(`Using English text: "${questionLabel.textContent}"`);
+    }
+    
     questionDiv.appendChild(questionLabel);
     
     // Create input based on question type
@@ -244,9 +366,16 @@ document.addEventListener('DOMContentLoaded', () => {
       textarea.name = question._id;
       textarea.maxLength = 100;
       textarea.required = true;
-      textarea.placeholder = STATE.currentLanguage === 'en' ? 
-        "Enter your response (max 100 characters)" : 
-        "Ingrese su respuesta (máximo 100 caracteres)";
+      
+      // Set placeholder text using our simple language system
+      if (window.SimpleLanguage) {
+        textarea.placeholder = SimpleLanguage.translateUI('placeholder');
+      } else {
+        // Fallback if language system is not available
+        textarea.placeholder = STATE.currentLanguage === 'en' ? 
+          "Enter your response (max 100 characters)" : 
+          "Ingrese su respuesta (máximo 100 caracteres)";
+      }
       
       // If we have a saved response for this question, populate it
       if (STATE.responses.has(question._id)) {
@@ -293,7 +422,13 @@ document.addEventListener('DOMContentLoaded', () => {
       questionDiv.appendChild(optionsContainer);
     }
     
+    // Add the question to the DOM
     DOM.questionsDiv.appendChild(questionDiv);
+    
+    // Synchronize the language of all form elements
+    if (window.i18n) {
+      setTimeout(synchronizeFormLanguage, 50);
+    }
   }
   
   /**
@@ -406,7 +541,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevButton = document.createElement('button');
     prevButton.type = 'button';
     prevButton.className = 'nav-button prev-button';
-    prevButton.textContent = STATE.currentLanguage === 'en' ? 'Previous' : 'Anterior';
+    prevButton.dataset.lang = 'previous';
+    
+    // Set button text using our simple language system
+    if (window.SimpleLanguage) {
+      prevButton.textContent = SimpleLanguage.translateUI('previous');
+    } else {
+      prevButton.textContent = STATE.currentLanguage === 'en' ? 'Previous' : 'Anterior';
+    }
+    
     prevButton.disabled = STATE.currentQuestionIndex === 0;
     prevButton.addEventListener('click', goToPreviousQuestion);
     navContainer.appendChild(prevButton);
@@ -420,11 +563,25 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (isLastQuestion) {
       nextButton.className = 'nav-button submit-button';
-      nextButton.textContent = translations[STATE.currentLanguage].submit || 'Submit';
+      nextButton.dataset.lang = 'submit';
+      
+      if (window.SimpleLanguage) {
+        nextButton.textContent = SimpleLanguage.translateUI('submit');
+      } else {
+        nextButton.textContent = translations[STATE.currentLanguage]?.submit || 'Submit';
+      }
+      
       nextButton.addEventListener('click', handleSubmitFromNavigation);
     } else {
       nextButton.className = 'nav-button next-button';
-      nextButton.textContent = STATE.currentLanguage === 'en' ? 'Next' : 'Siguiente';
+      nextButton.dataset.lang = 'next';
+      
+      if (window.SimpleLanguage) {
+        nextButton.textContent = SimpleLanguage.translateUI('next');
+      } else {
+        nextButton.textContent = STATE.currentLanguage === 'en' ? 'Next' : 'Siguiente';
+      }
+      
       nextButton.addEventListener('click', goToNextQuestion);
     }
     
@@ -442,6 +599,14 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCurrentQuestion();
       renderProgressIndicator();
       renderNavigation();
+      
+      // Apply translations after navigation
+      if (window.SimpleLanguage) {
+        setTimeout(() => {
+          SimpleLanguage.updateUI();
+          console.log('Applied translations after previous navigation');
+        }, 50);
+      }
     }
   }
   
@@ -461,6 +626,14 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCurrentQuestion();
       renderProgressIndicator();
       renderNavigation();
+      
+      // Apply translations after navigation
+      if (window.SimpleLanguage) {
+        setTimeout(() => {
+          SimpleLanguage.updateUI();
+          console.log('Applied translations after next navigation');
+        }, 50);
+      }
       
       // Scroll to top of the question
       DOM.questionsDiv.scrollIntoView({ behavior: 'smooth' });
