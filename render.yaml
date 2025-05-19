@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: employee-sentiment-app
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: employee-sentiment-db
+          property: connectionString
+    autoDeploy: true
+
+databases:
+  - name: employee-sentiment-db
+    databaseName: employee_sentiment_db
+    plan: free
