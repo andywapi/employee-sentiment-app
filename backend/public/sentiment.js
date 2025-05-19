@@ -6,18 +6,32 @@
 const SentimentAnalyzer = (function() {
   // Positive and negative word lists
   const positiveWords = [
+    // General positive terms
     'good', 'great', 'excellent', 'amazing', 'awesome', 'fantastic', 'wonderful', 'happy',
     'pleased', 'satisfied', 'enjoy', 'like', 'love', 'best', 'better', 'improved',
     'improvement', 'helpful', 'positive', 'success', 'successful', 'well', 'benefit',
     'benefits', 'effective', 'efficiently', 'recommend', 'appreciated', 'appreciate',
     'thank', 'thanks', 'grateful', 'glad', 'perfect', 'interesting', 'innovative',
     'impressive', 'exceptional', 'outstanding', 'superior', 'favorable', 'convenient',
-    'convenient', 'comfortable', 'excited', 'exciting', 'enthusiasm', 'enthusiastic',
+    'comfortable', 'excited', 'exciting', 'enthusiasm', 'enthusiastic',
     'satisfied', 'satisfaction', 'satisfying', 'proud', 'pride', 'delight', 'delighted',
-    'delightful', 'pleased', 'pleasure', 'pleasant', 'impressed', 'impressive'
+    'delightful', 'pleased', 'pleasure', 'pleasant', 'impressed', 'impressive',
+    
+    // Workplace-specific positive terms
+    'productive', 'efficient', 'organized', 'motivated', 'inspiring', 'supportive',
+    'collaborative', 'teamwork', 'leadership', 'mentoring', 'growth', 'opportunity',
+    'opportunities', 'advancement', 'promotion', 'bonus', 'raise', 'recognition',
+    'acknowledged', 'praised', 'rewarded', 'valued', 'respected', 'inclusive',
+    'diverse', 'flexible', 'balance', 'fair', 'transparent', 'honest', 'integrity',
+    'trust', 'reliable', 'dependable', 'professional', 'expertise', 'skilled',
+    'competent', 'knowledgeable', 'learning', 'development', 'training', 'progress',
+    'achievement', 'accomplished', 'succeed', 'succeeding', 'succeeded', 'win', 'winning',
+    'won', 'achieve', 'achieved', 'achieving', 'excel', 'excelled', 'excelling',
+    'thrive', 'thriving', 'thrived', 'prosper', 'prospering', 'prospered'
   ];
 
   const negativeWords = [
+    // General negative terms
     'bad', 'poor', 'terrible', 'horrible', 'awful', 'disappointing', 'disappointed',
     'frustrating', 'frustrated', 'annoying', 'annoyed', 'unhappy', 'sad', 'hate',
     'dislike', 'worst', 'worse', 'difficult', 'hard', 'problem', 'issue', 'concern',
@@ -27,7 +41,20 @@ const SentimentAnalyzer = (function() {
     'troublesome', 'inconvenient', 'uncomfortable', 'dissatisfied', 'dissatisfaction',
     'unpleasant', 'unfavorable', 'unfortunate', 'unprofessional', 'unreliable',
     'unreasonable', 'unacceptable', 'unsatisfactory', 'unsatisfied', 'useless',
-    'worthless', 'waste', 'wasted', 'wasting', 'mediocre', 'subpar'
+    'worthless', 'waste', 'wasted', 'wasting', 'mediocre', 'subpar',
+    
+    // Workplace-specific negative terms
+    'overworked', 'underpaid', 'micromanage', 'micromanaged', 'micromanaging',
+    'unfair', 'biased', 'discrimination', 'harassment', 'bullying', 'toxic',
+    'hostile', 'overwhelming', 'burnout', 'burnt', 'understaffed', 'turnover',
+    'quit', 'quitting', 'resign', 'resigning', 'resigned', 'leave', 'leaving',
+    'left', 'abandon', 'abandoning', 'abandoned', 'ignore', 'ignored', 'ignoring',
+    'neglect', 'neglected', 'neglecting', 'mismanage', 'mismanaged', 'mismanaging',
+    'disorganized', 'chaotic', 'unclear', 'vague', 'ambiguous', 'miscommunication',
+    'conflict', 'argument', 'disagreement', 'dispute', 'tension', 'pressure',
+    'deadline', 'overdue', 'late', 'delay', 'delayed', 'postpone', 'postponed',
+    'cancel', 'canceled', 'cancellation', 'cutback', 'layoff', 'fired', 'termination',
+    'demoted', 'demotion', 'undervalued', 'underappreciated', 'overlooked', 'ignored'
   ];
 
   // Intensifiers and negators that modify sentiment
@@ -106,10 +133,10 @@ const SentimentAnalyzer = (function() {
     
     // Determine sentiment label
     let label = 'neutral';
-    if (normalizedScore > 0.05) {
-      label = normalizedScore > 0.15 ? 'very positive' : 'positive';
-    } else if (normalizedScore < -0.05) {
-      label = normalizedScore < -0.15 ? 'very negative' : 'negative';
+    if (normalizedScore > 0.03) {
+      label = normalizedScore > 0.12 ? 'very positive' : 'positive';
+    } else if (normalizedScore < -0.03) {
+      label = normalizedScore < -0.12 ? 'very negative' : 'negative';
     }
     
     return {
@@ -130,10 +157,10 @@ const SentimentAnalyzer = (function() {
    * @returns {string} Color in hex format
    */
   function getSentimentColor(score) {
-    if (score > 0.15) return '#4CAF50'; // Very positive - Green
-    if (score > 0.05) return '#8BC34A'; // Positive - Light green
-    if (score > -0.05) return '#9E9E9E'; // Neutral - Gray
-    if (score > -0.15) return '#FF9800'; // Negative - Orange
+    if (score > 0.12) return '#4CAF50'; // Very positive - Green
+    if (score > 0.03) return '#8BC34A'; // Positive - Light green
+    if (score > -0.03) return '#9E9E9E'; // Neutral - Gray
+    if (score > -0.12) return '#FF9800'; // Negative - Orange
     return '#F44336'; // Very negative - Red
   }
 
@@ -143,10 +170,10 @@ const SentimentAnalyzer = (function() {
    * @returns {string} Descriptive label
    */
   function getSentimentLabel(score) {
-    if (score > 0.15) return 'Very Positive';
-    if (score > 0.05) return 'Positive';
-    if (score > -0.05) return 'Neutral';
-    if (score > -0.15) return 'Negative';
+    if (score > 0.12) return 'Very Positive';
+    if (score > 0.03) return 'Positive';
+    if (score > -0.03) return 'Neutral';
+    if (score > -0.12) return 'Negative';
     return 'Very Negative';
   }
 

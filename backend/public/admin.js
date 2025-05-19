@@ -1584,8 +1584,8 @@ function createSentimentChart(question, sentiments, canvas) {
     
     // Count the sentiments
     sentiments.forEach(sentiment => {
-      if (sentimentCounts[sentiment.category] !== undefined) {
-        sentimentCounts[sentiment.category]++;
+      if (sentimentCounts[sentiment.label] !== undefined) {
+        sentimentCounts[sentiment.label]++;
       }
     });
     
