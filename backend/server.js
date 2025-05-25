@@ -42,12 +42,19 @@ app.use((req, res, next) => {
  */
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/employee_sentiment_db';
+    // Use different connection strings based on environment
+    const mongoURI = process.env.NODE_ENV === 'production'
+      ? process.env.MONGODB_URI // Use cloud MongoDB in production
+      : 'mongodb://localhost:27017/employee_sentiment_db'; // Use local MongoDB in development
     
-    console.log(`Connecting to MongoDB...`);
+    console.log(`Connecting to MongoDB in ${process.env.NODE_ENV || 'development'} mode...`);
+    // Set strictQuery to false to prepare for Mongoose 7
+    mongoose.set('strictQuery', false);
+    
     const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000 // Wait 5 seconds before timing out
     });
     
     console.log(`MongoDB Connected: ${conn.connection.host}`);
