@@ -851,11 +851,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Now handle the actual submission
     try {
-      // Validate userId
-      const userId = document.getElementById('userId').value.trim();
-      
-      if (!userId) {
-        showError(translations[STATE.currentLanguage].userIdRequired || 'User ID is required');
+      // Validate employeeId
+      if (!STATE.employeeId) {
+        showError(translations[STATE.currentLanguage].employeeIdRequired || 'Employee ID is required');
         return;
       }
       

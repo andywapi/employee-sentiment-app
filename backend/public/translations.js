@@ -86,7 +86,9 @@ const translations = {
     failedToLoad: "Failed to load questions. Please try again.",
     multipleChoiceRequired: "Multiple choice questions must have at least one option",
     noData: "No data to display",
-    userIdRequired: "User ID is required"
+    userIdRequired: "User ID is required",
+    employeeIdRequired: "Employee ID is required",
+    employeeId: "Employee ID"
   },
   es: {
     // Common
@@ -174,6 +176,8 @@ const translations = {
     failedToLoad: "Error al cargar las preguntas. Por favor intente de nuevo.",
     multipleChoiceRequired: "Las preguntas de opción múltiple deben tener al menos una opción",
     noData: "No hay datos para mostrar",
-    userIdRequired: "El ID de usuario es requerido"
+    userIdRequired: "El ID de usuario es requerido",
+    employeeIdRequired: "El ID de empleado es requerido",
+    employeeId: "ID de Empleado"
   }
 };
