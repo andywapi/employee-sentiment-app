@@ -23,13 +23,19 @@ document.addEventListener('DOMContentLoaded', () => {
       noQuestionsMessage: 'No questions found.',
       failedToLoad: 'Failed to load questions. Please try again.',
       loading: 'Loading...',
-      submit: 'Submit'
+      submit: 'Submit',
+      employeeIdPrompt: 'Please enter your Employee ID',
+      employeeIdHelp: 'This helps us prevent duplicate submissions',
+      nextButton: 'Next'
     },
     es: {
       noQuestionsMessage: 'No se encontraron preguntas.',
       failedToLoad: 'Error al cargar las preguntas. Por favor, intente de nuevo.',
       loading: 'Cargando...',
-      submit: 'Enviar'
+      submit: 'Enviar',
+      employeeIdPrompt: 'Por favor, ingrese su ID de empleado',
+      employeeIdHelp: 'Esto nos ayuda a prevenir envíos duplicados',
+      nextButton: 'Siguiente'
     }
   };
   
@@ -39,9 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     weatherData: null,
     temperatureUnit: localStorage.getItem('temperatureUnit') || 'C', // Default to Celsius
     questions: [],
-    currentQuestionIndex: 0,
+    currentQuestionIndex: -1, // Start at -1 for employee ID input
     responses: new Map(),
-    showConfirmation: false
+    showConfirmation: false,
+    employeeId: ''
   };
   
   // DOM Elements
@@ -114,6 +121,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update UI with translations
     updateLanguage();
     
+    // Check if survey was already submitted
+    const lastSubmission = localStorage.getItem('lastSurveySubmission');
+    if (lastSubmission) {
+      const lastDate = new Date(lastSubmission);
+      const now = new Date();
+      // If last submission was within 24 hours, show message
+      if (now - lastDate < 24 * 60 * 60 * 1000) {
+        showError('You have already submitted a survey in the last 24 hours. Please try again tomorrow.');
+        return;
+      }
+    }
+
     // Load questions
     loadQuestions();
     
@@ -799,7 +818,32 @@ document.addEventListener('DOMContentLoaded', () => {
    * Handle form submission triggered from the navigation button
    */
   async function handleSubmitFromNavigation() {
-    // Validate the current question first
+    // Check if we're on the employee ID input screen
+    if (STATE.currentQuestionIndex === -1) {
+      const employeeIdInput = document.querySelector('#employee-id');
+      if (!employeeIdInput || !employeeIdInput.value.trim()) {
+        showError('Please enter your Employee ID');
+        return;
+      }
+      STATE.employeeId = employeeIdInput.value.trim();
+
+      // Check if this employee has submitted today
+      const lastSubmission = localStorage.getItem(`lastSubmission_${STATE.employeeId}`);
+      if (lastSubmission) {
+        const lastDate = new Date(lastSubmission);
+        const now = new Date();
+        if (now - lastDate < 24 * 60 * 60 * 1000) {
+          showError('You have already submitted a survey in the last 24 hours. Please try again tomorrow.');
+          return;
+        }
+      }
+
+      STATE.currentQuestionIndex = 0;
+      renderCurrentQuestion();
+      return;
+    }
+
+    // Validate the current question
     const currentQuestion = STATE.questions[STATE.currentQuestionIndex];
     if (!validateCurrentQuestion(currentQuestion)) {
       return;
@@ -844,7 +888,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Create the appropriate payload based on question type
         const payload = {
-          userId,
+          employeeId: STATE.employeeId,
           questionId: question._id
         };
         
