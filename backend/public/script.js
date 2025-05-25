@@ -16,6 +16,22 @@ document.addEventListener('DOMContentLoaded', () => {
     BASE_URL: window.location.origin + '/api',
     WEATHER_API: window.location.origin + '/api/weather' // Changed to use our backend as a proxy
   };
+
+  // Translations
+  const translations = {
+    en: {
+      noQuestionsMessage: 'No questions found.',
+      failedToLoad: 'Failed to load questions. Please try again.',
+      loading: 'Loading...',
+      submit: 'Submit'
+    },
+    es: {
+      noQuestionsMessage: 'No se encontraron preguntas.',
+      failedToLoad: 'Error al cargar las preguntas. Por favor, intente de nuevo.',
+      loading: 'Cargando...',
+      submit: 'Enviar'
+    }
+  };
   
   // State management
   const STATE = {
@@ -134,14 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.form.addEventListener('submit', handleFormSubmit);
     
     // Weather display click for temperature unit toggle
-    DOM.weatherDisplay.addEventListener('click', () => {
-      // Toggle between Celsius and Fahrenheit
-      STATE.temperatureUnit = STATE.temperatureUnit === 'C' ? 'F' : 'C';
-      // Save preference
-      localStorage.setItem('temperatureUnit', STATE.temperatureUnit);
-      // Update display
-      updateWeatherDisplay();
-    });
+    if (DOM.weatherDisplay) {
+      DOM.weatherDisplay.addEventListener('click', () => {
+        // Toggle between Celsius and Fahrenheit
+        STATE.temperatureUnit = STATE.temperatureUnit === 'C' ? 'F' : 'C';
+        // Save preference
+        localStorage.setItem('temperatureUnit', STATE.temperatureUnit);
+        // Update display
+        updateWeatherDisplay();
+      });
+    }
     
     // Navigation button events will be set up in renderNavigation()
   }
@@ -205,9 +223,15 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   async function loadQuestions() {
     try {
+      console.log('Loading questions...');
       showLoading(DOM.questionsDiv);
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/questions?active=true`, {
+      const url = window.location.origin + '/api/questions?active=true';
+      console.log('Fetching questions from:', url);
+      console.log('Current window.location:', window.location);
+      console.log('Current window.location.origin:', window.location.origin);
+      
+      const response = await fetch(url, {
         headers: getAuthHeaders()
       });
       
@@ -216,9 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       const result = await response.json();
+      console.log('API response:', result);
       
       // Handle both response formats (array or {success, data})
       const questions = Array.isArray(result) ? result : (result.data || []);
+      console.log('Parsed questions:', questions);
       
       if (questions.length === 0) {
         DOM.questionsDiv.innerHTML = `

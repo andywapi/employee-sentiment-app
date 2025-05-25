@@ -122,63 +122,75 @@ function init() {
  */
 function setupEventListeners() {
   // Language toggle
-  DOM.languageSelect.addEventListener('change', (e) => {
-    STATE.currentLanguage = e.target.value;
-    localStorage.setItem('language', STATE.currentLanguage);
-    updateLanguage();
-  });
+  if (DOM.languageSelect) {
+    DOM.languageSelect.addEventListener('change', (e) => {
+      STATE.currentLanguage = e.target.value;
+      localStorage.setItem('language', STATE.currentLanguage);
+      updateLanguage();
+    });
+  }
   
   // Tab switching
-  DOM.tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Remove active class from all tabs and contents
-      DOM.tabs.forEach(t => t.classList.remove('active'));
-      DOM.tabContents.forEach(c => c.classList.remove('active'));
-      
-      // Add active class to clicked tab and corresponding content
-      tab.classList.add('active');
-      const tabName = tab.dataset.tab;
-      document.getElementById(`${tabName}-tab`).classList.add('active');
-      
-      // Load data for the active tab
-      if (tabName === 'questions') {
-        loadQuestions();
-      } else if (tabName === 'responses') {
-        loadUsers();
-      } else if (tabName === 'analytics') {
-        loadQuestionCharts(); // Load multiple choice question charts
-        loadSentimentCharts(); // Load sentiment analysis charts for text questions
+  if (DOM.tabs) {
+    DOM.tabs.forEach(tab => {
+      if (tab) {
+        tab.addEventListener('click', () => {
+          // Remove active class from all tabs and contents
+          DOM.tabs.forEach(t => t.classList.remove('active'));
+          DOM.tabContents.forEach(c => c.classList.remove('active'));
+          
+          // Add active class to clicked tab and corresponding content
+          tab.classList.add('active');
+          const tabName = tab.dataset.tab;
+          document.getElementById(`${tabName}-tab`).classList.add('active');
+          
+          // Load data for the active tab
+          if (tabName === 'questions') {
+            loadQuestions();
+          } else if (tabName === 'responses') {
+            loadUsers();
+          } else if (tabName === 'analytics') {
+            loadQuestionCharts(); // Load multiple choice question charts
+            loadSentimentCharts(); // Load sentiment analysis charts for text questions
+          }
+        });
       }
     });
-  });
+  }
   
   // Weather display click for temperature unit toggle
-  DOM.weatherDisplay.addEventListener('click', () => {
-    // Toggle between Celsius and Fahrenheit
-    STATE.temperatureUnit = STATE.temperatureUnit === 'C' ? 'F' : 'C';
-    // Save preference
-    localStorage.setItem('temperatureUnit', STATE.temperatureUnit);
-    // Update display
-    updateWeatherDisplay();
-  });
+  if (DOM.weatherDisplay) {
+    DOM.weatherDisplay.addEventListener('click', () => {
+      // Toggle between Celsius and Fahrenheit
+      STATE.temperatureUnit = STATE.temperatureUnit === 'C' ? 'F' : 'C';
+      // Save preference
+      localStorage.setItem('temperatureUnit', STATE.temperatureUnit);
+      // Update display
+      updateWeatherDisplay();
+    });
+  }
   
   // Question type change
-  DOM.questionType.addEventListener('change', function() {
-    DOM.optionsContainer.style.display = this.value === 'multipleChoice' ? 'block' : 'none';
-  });
+  if (DOM.questionType) {
+    DOM.questionType.addEventListener('change', function() {
+      if (DOM.optionsContainer) {
+        DOM.optionsContainer.style.display = this.value === 'multipleChoice' ? 'block' : 'none';
+      }
+    });
+  }
   
   // Question form submission
-  DOM.questionForm.addEventListener('submit', handleQuestionFormSubmit);
+  if (DOM.questionForm) {
+    DOM.questionForm.addEventListener('submit', handleQuestionFormSubmit);
+  }
   
   // Question reordering
   if (DOM.reorderModeBtn) {
     DOM.reorderModeBtn.addEventListener('click', enableReorderMode);
   }
-  
   if (DOM.saveOrderBtn) {
     DOM.saveOrderBtn.addEventListener('click', saveQuestionOrder);
   }
-  
   if (DOM.cancelOrderBtn) {
     DOM.cancelOrderBtn.addEventListener('click', cancelReorderMode);
   }
