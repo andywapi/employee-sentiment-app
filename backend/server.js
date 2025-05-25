@@ -54,14 +54,41 @@ const connectDB = async () => {
     const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000 // Wait 5 seconds before timing out
+      serverSelectionTimeoutMS: 10000, // Increase timeout to 10 seconds
+      heartbeatFrequencyMS: 2000,     // Check connection every 2 seconds
+      retryWrites: true,              // Enable retry for write operations
+      w: 'majority',                  // Wait for writes to be acknowledged
+      maxPoolSize: 10,               // Maximum number of connections
+      minPoolSize: 2                 // Minimum number of connections
     });
     
+    // Handle MongoDB connection events
+    mongoose.connection.on('connected', () => {
+      console.log(`MongoDB Connected: ${conn.connection.host}`);
+    });
+
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+      // Don't exit process, let it retry
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.log('MongoDB disconnected. Attempting to reconnect...');
+      // Mongoose will automatically try to reconnect
+    });
+
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`Error connecting to MongoDB: ${error.message}`);
-    // Exit process with failure
-    process.exit(1);
+    // Don't exit process, let it retry
+    if (process.env.NODE_ENV === 'production') {
+      // In production, wait and retry
+      console.log('Retrying MongoDB connection in 5 seconds...');
+      setTimeout(connectDB, 5000);
+    } else {
+      // In development, exit to show the error
+      process.exit(1);
+    }
   }
 };
 
@@ -157,7 +184,29 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error details:', {
+    message: err.message,
+    stack: err.stack,
+    type: err.name,
+    code: err.code
+  });
+
+  // Handle specific types of errors
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: err.message
+    });
+  }
+
+  if (err.name === 'MongoServerError' && err.code === 11000) {
+    return res.status(409).json({
+      error: 'Duplicate Entry',
+      message: 'This record already exists'
+    });
+  }
+
+  // Generic error response
   res.status(500).json({
     error: 'Server Error',
     message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
