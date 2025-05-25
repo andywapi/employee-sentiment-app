@@ -13,7 +13,7 @@ router.delete('/questions/:id', questionController.deleteQuestion);
 
 // Response Routes
 router.post('/responses', responseController.submitResponse);
-router.get('/responses/user/:userId', responseController.getUserResponses);
+router.get('/responses/employee/:employeeId', responseController.getUserResponses);
 router.get('/responses', responseController.getAllResponses);
 router.get('/responses/users', responseController.getUsers);
 router.get('/responses/pareto', responseController.getParetoAnalysis);
