@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Sentimiento para Empleados</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+        }
+        .sentiment-label {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .very-positive, .muy-positivo { color: #4CAF50; }
+        .positive, .positivo { color: #8BC34A; }
+        .neutral { color: #9E9E9E; }
+        .negative, .negativo { color: #FF9800; }
+        .very-negative, .muy-negativo { color: #F44336; }
+        .sample-responses {
+            margin-top: 20px;
+        }
+        .sample-responses button {
+            margin-right: 5px;
+            margin-bottom: 5px;
+            background-color: #2196F3;
+        }
+        .sample-responses button:hover {
+            background-color: #0b7dda;
+        }
+        .details {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        .language-toggle {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+        .language-toggle a {
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="language-toggle">
+        <a href="sentiment-tester.html">English</a> | <strong>Español</strong>
+    </div>
+    
+    <h1>Analizador de Sentimiento para Empleados</h1>
+    
+    <div class="container">
+        <h2>Prueba el Análisis de Sentimiento Mejorado</h2>
+        <p>Ingresa comentarios de empleados a continuación para analizar su sentimiento:</p>
+        <textarea id="feedback-text" placeholder="Ingresa comentarios de empleados aquí..."></textarea>
+        <button onclick="analyzeSentiment()">Analizar Sentimiento</button>
+        
+        <div class="result" id="result" style="display: none;">
+            <h3>Resultado del Análisis:</h3>
+            <div>
+                Sentimiento: <span id="sentiment-label" class="sentiment-label"></span>
+            </div>
+            <div>
+                Puntuación: <span id="sentiment-score"></span>
+            </div>
+            <div>
+                Confianza: <span id="confidence"></span>
+            </div>
+            <div class="details" id="details"></div>
+        </div>
+    </div>
+    
+    <div class="container sample-responses">
+        <h2>Respuestas de Ejemplo</h2>
+        <p>Haz clic en cualquier respuesta de ejemplo para analizarla:</p>
+        
+        <h3>Ejemplos Positivos:</h3>
+        <div>
+            <button onclick="setSampleText('Realmente disfruto trabajar con mi equipo, son muy solidarios.')">Equipo Solidario</button>
+            <button onclick="setSampleText('El nuevo programa de formación de liderazgo ha sido excelente para mi desarrollo profesional.')">Formación de Liderazgo</button>
+            <button onclick="setSampleText('Agradezco el horario flexible que me ayuda a mantener el equilibrio entre trabajo y vida personal.')">Equilibrio Trabajo-Vida</button>
+        </div>
+        
+        <h3>Ejemplos Negativos:</h3>
+        <div>
+            <button onclick="setSampleText('Me siento sobrecargado de trabajo y con falta de personal en nuestro departamento.')">Sobrecarga de Trabajo</button>
+            <button onclick="setSampleText('La comunicación de la gerencia ha sido deficiente y confusa.')">Comunicación Deficiente</button>
+            <button onclick="setSampleText('El estilo de microgestión es frustrante y reduce mi productividad.')">Microgestión</button>
+        </div>
+        
+        <h3>Ejemplos Mixtos/Neutrales:</h3>
+        <div>
+            <button onclick="setSampleText('Algunos aspectos del nuevo sistema son buenos, pero otros necesitan mejoras.')">Revisión Mixta del Sistema</button>
+            <button onclick="setSampleText('La ubicación de la oficina es conveniente, aunque la situación del estacionamiento es difícil.')">Ubicación de la Oficina</button>
+            <button onclick="setSampleText('Me agradan mis compañeros de trabajo pero encuentro el trabajo en sí algo aburrido.')">Contenido del Trabajo</button>
+        </div>
+    </div>
+
+    <script>
+        // Implementar el analizador de sentimiento directamente en este script
+        const SentimentAnalyzer = (function() {
+            // Listas de palabras positivas y negativas en español
+            const positiveWords = [
+                // Términos positivos generales
+                'bueno', 'excelente', 'increíble', 'maravilloso', 'fantástico', 'feliz',
+                'contento', 'satisfecho', 'disfrutar', 'gustar', 'encantar', 'amar', 'mejor',
+                'mejorado', 'mejora', 'útil', 'positivo', 'éxito', 'exitoso', 'bien', 'beneficio',
+                'beneficios', 'efectivo', 'eficientemente', 'recomendar', 'agradecido', 'agradecer',
+                'gracias', 'perfecto', 'interesante', 'innovador', 'impresionante', 'excepcional',
+                'destacado', 'superior', 'favorable', 'conveniente', 'cómodo', 'emocionado',
+                'emocionante', 'entusiasmo', 'entusiasta', 'satisfacción', 'satisfactorio',
+                'orgulloso', 'orgullo', 'deleite', 'deleitado', 'placer', 'agradable',
+                
+                // Términos positivos específicos del lugar de trabajo
+                'productivo', 'eficiente', 'organizado', 'motivado', 'inspirador', 'solidario',
+                'colaborativo', 'equipo', 'liderazgo', 'mentoría', 'crecimiento', 'oportunidad',
+                'oportunidades', 'avance', 'promoción', 'bono', 'aumento', 'reconocimiento',
+                'reconocido', 'elogiado', 'recompensado', 'valorado', 'respetado', 'inclusivo',
+                'diverso', 'flexible', 'equilibrio', 'justo', 'transparente', 'honesto', 'integridad',
+                'confianza', 'confiable', 'dependible', 'profesional', 'experiencia', 'habilidoso',
+                'competente', 'conocedor', 'aprendizaje', 'desarrollo', 'formación', 'progreso',
+                'logro', 'logrado', 'conseguir', 'conseguido', 'éxito', 'exitoso', 'prosperar',
+                'próspero'
+            ];
+
+            const negativeWords = [
+                // Términos negativos generales
+                'malo', 'pobre', 'terrible', 'horrible', 'decepcionante', 'decepcionado',
+                'frustrante', 'frustrado', 'molesto', 'infeliz', 'triste', 'odiar',
+                'desagradar', 'peor', 'difícil', 'duro', 'problema', 'asunto', 'preocupación',
+                'negativo', 'fallar', 'fracaso', 'fallado', 'inadecuado', 'insuficiente', 'ineficaz',
+                'ineficiente', 'lento', 'confuso', 'confundido', 'complicado', 'complejo', 'aburrido',
+                'cansado', 'agotado', 'estresante', 'estrés', 'doloroso', 'dolor', 'problema',
+                'problemático', 'inconveniente', 'incómodo', 'insatisfecho', 'insatisfacción',
+                'desagradable', 'desfavorable', 'desafortunado', 'poco profesional', 'poco fiable',
+                'irrazonable', 'inaceptable', 'insatisfactorio', 'inútil', 'sin valor', 'desperdicio',
+                'desperdiciado', 'mediocre', 'deficiente',
+                
+                // Términos negativos específicos del lugar de trabajo
+                'sobrecargado', 'mal pagado', 'microgestión', 'injusto', 'sesgado', 'discriminación',
+                'acoso', 'intimidación', 'tóxico', 'hostil', 'abrumador', 'agotamiento', 'agotado',
+                'falta de personal', 'rotación', 'renunciar', 'renuncia', 'renunciado', 'abandonar',
+                'abandonado', 'ignorar', 'ignorado', 'descuidar', 'descuidado', 'mala gestión',
+                'desorganizado', 'caótico', 'poco claro', 'vago', 'ambiguo', 'malentendido',
+                'conflicto', 'argumento', 'desacuerdo', 'disputa', 'tensión', 'presión',
+                'plazo', 'atrasado', 'tarde', 'retraso', 'retrasado', 'posponer', 'pospuesto',
+                'cancelar', 'cancelado', 'cancelación', 'recorte', 'despido', 'despedido', 'terminación',
+                'degradado', 'degradación', 'infravalorado', 'poco apreciado', 'pasado por alto'
+            ];
+
+            // Intensificadores y negadores que modifican el sentimiento
+            const intensifiers = [
+                'muy', 'realmente', 'extremadamente', 'absolutamente', 'completamente', 'altamente',
+                'enormemente', 'particularmente', 'especialmente', 'excepcionalmente', 'totalmente',
+                'bastante', 'notablemente', 'extraordinariamente', 'increíblemente', 'profundamente'
+            ];
+
+            const negators = [
+                'no', 'nunca', 'ni', 'ninguno', 'nadie', 'nada', 'ninguna', 'apenas',
+                'escasamente', 'difícilmente', 'tampoco'
+            ];
+
+            /**
+             * Analizar el sentimiento de un texto
+             * @param {string} text - El texto a analizar
+             * @returns {Object} Resultado del análisis de sentimiento con puntuación y etiqueta
+             */
+            function analyzeSentiment(text) {
+                if (!text || typeof text !== 'string' || text.trim() === '') {
+                    return { score: 0, label: 'neutral', confidence: 0 };
+                }
+
+                // Normalizar texto: minúsculas y eliminar puntuación
+                const normalizedText = text.toLowerCase().replace(/[^\wáéíóúüñ\s]/g, '');
+                const words = normalizedText.split(/\s+/);
+                
+                let score = 0;
+                let positiveCount = 0;
+                let negativeCount = 0;
+                let wordCount = 0;
+                
+                // Analizar cada palabra en contexto
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    if (word.length < 2) continue; // Omitir palabras muy cortas
+                    
+                    wordCount++;
+                    
+                    // Verificar negación (mirando la palabra anterior)
+                    const isNegated = i > 0 && negators.includes(words[i-1]);
+                    
+                    // Verificar intensificadores
+                    const isIntensified = i > 0 && intensifiers.includes(words[i-1]);
+                    const intensifierMultiplier = isIntensified ? 2 : 1;
+                    
+                    // Calcular sentimiento de la palabra
+                    if (positiveWords.includes(word)) {
+                        if (isNegated) {
+                            score -= 1 * intensifierMultiplier;
+                            negativeCount++;
+                        } else {
+                            score += 1 * intensifierMultiplier;
+                            positiveCount++;
+                        }
+                    } else if (negativeWords.includes(word)) {
+                        if (isNegated) {
+                            score += 1 * intensifierMultiplier;
+                            positiveCount++;
+                        } else {
+                            score -= 1 * intensifierMultiplier;
+                            negativeCount++;
+                        }
+                    }
+                }
+                
+                // Normalizar puntuación entre -1 y 1
+                const normalizedScore = wordCount > 0 ? score / wordCount : 0;
+                
+                // Calcular confianza basada en la proporción de palabras de sentimiento
+                const sentimentWordCount = positiveCount + negativeCount;
+                const confidence = wordCount > 0 ? sentimentWordCount / wordCount : 0;
+                
+                // Determinar etiqueta de sentimiento
+                let label = 'neutral';
+                if (normalizedScore > 0.03) {
+                    label = normalizedScore > 0.12 ? 'muy positivo' : 'positivo';
+                } else if (normalizedScore < -0.03) {
+                    label = normalizedScore < -0.12 ? 'muy negativo' : 'negativo';
+                }
+                
+                return {
+                    score: normalizedScore,
+                    label: label,
+                    confidence: confidence,
+                    details: {
+                        positiveWords: positiveCount,
+                        negativeWords: negativeCount,
+                        totalWords: wordCount
+                    }
+                };
+            }
+
+            /**
+             * Obtener el color para una puntuación de sentimiento
+             * @param {number} score - Puntuación de sentimiento entre -1 y 1
+             * @returns {string} Color en formato hex
+             */
+            function getSentimentColor(score) {
+                if (score > 0.12) return '#4CAF50'; // Muy positivo - Verde
+                if (score > 0.03) return '#8BC34A'; // Positivo - Verde claro
+                if (score > -0.03) return '#9E9E9E'; // Neutral - Gris
+                if (score > -0.12) return '#FF9800'; // Negativo - Naranja
+                return '#F44336'; // Muy negativo - Rojo
+            }
+
+            /**
+             * Obtener una etiqueta descriptiva para una puntuación de sentimiento
+             * @param {number} score - Puntuación de sentimiento entre -1 y 1
+             * @returns {string} Etiqueta descriptiva
+             */
+            function getSentimentLabel(score) {
+                if (score > 0.12) return 'Muy Positivo';
+                if (score > 0.03) return 'Positivo';
+                if (score > -0.03) return 'Neutral';
+                if (score > -0.12) return 'Negativo';
+                return 'Muy Negativo';
+            }
+
+            // API pública
+            return {
+                analyze: analyzeSentiment,
+                getColor: getSentimentColor,
+                getLabel: getSentimentLabel
+            };
+        })();
+
+        function analyzeSentiment() {
+            const text = document.getElementById('feedback-text').value.trim();
+            
+            if (!text) {
+                alert('Por favor, ingresa algún texto para analizar.');
+                return;
+            }
+            
+            const sentiment = SentimentAnalyzer.analyze(text);
+            const label = SentimentAnalyzer.getLabel(sentiment.score);
+            const color = SentimentAnalyzer.getColor(sentiment.score);
+            
+            // Mostrar el resultado
+            document.getElementById('sentiment-label').textContent = label;
+            document.getElementById('sentiment-label').className = 'sentiment-label ' + label.toLowerCase().replace(' ', '-');
+            document.getElementById('sentiment-score').textContent = sentiment.score.toFixed(4);
+            document.getElementById('confidence').textContent = (sentiment.confidence * 100).toFixed(1) + '%';
+            document.getElementById('details').textContent = 
+                `Se encontraron ${sentiment.details.positiveWords} palabras positivas y ${sentiment.details.negativeWords} palabras negativas de un total de ${sentiment.details.totalWords} palabras.`;
+            
+            document.getElementById('result').style.display = 'block';
+        }
+        
+        function setSampleText(text) {
+            document.getElementById('feedback-text').value = text;
+            analyzeSentiment();
+        }
+    </script>
+</body>
+</html>

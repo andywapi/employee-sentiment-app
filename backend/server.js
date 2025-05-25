@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 const connectDB = async () => {
   try {
     // Use MONGODB_URI from environment variables
-    const mongoURI = process.env.MONGODB_URI;
+    const mongoURI = 'mongodb://localhost:27017/employee_sentiment_db';
     
     console.log(`Connecting to MongoDB...`);
     const conn = await mongoose.connect(mongoURI, {
