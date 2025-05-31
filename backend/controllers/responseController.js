@@ -3,10 +3,10 @@ const SurveyQuestion = require('../models/SurveyQuestion');
 
 exports.submitResponse = async (req, res) => {
   try {
-    const { questionId, employeeId, responseText, selectedOption } = req.body;
+    const { questionId, userId, responseText, selectedOption } = req.body;
     
-    if (!employeeId) {
-      return res.status(400).json({ message: 'Employee ID is required' });
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
     }
 
     // Validate question type and response
@@ -17,7 +17,7 @@ exports.submitResponse = async (req, res) => {
 
     console.log('Submitting response:', {
       questionId,
-      employeeId,
+      userId,
       questionType: question.questionType,
       responseText,
       selectedOption
@@ -26,7 +26,7 @@ exports.submitResponse = async (req, res) => {
     // Create response object based on question type
     const responseData = {
       questionId,
-      employeeId,
+      userId,
     };
 
     // Add the appropriate response field based on question type
@@ -53,8 +53,8 @@ exports.submitResponse = async (req, res) => {
 
 exports.getUserResponses = async (req, res) => {
   try {
-    const { employeeId } = req.params;
-    const responses = await SurveyResponse.find({ employeeId })
+    const { userId } = req.params;
+    const responses = await SurveyResponse.find({ userId })
       .populate('questionId');
     
     console.log('Raw responses from DB:', JSON.stringify(responses, null, 2));
@@ -114,7 +114,7 @@ exports.getAllResponses = async (req, res) => {
       if (!response.questionId) {
         return {
           _id: response._id,
-          employeeId: response.employeeId,
+          userId: response.userId,
           questionId: null,
           questionText: 'Unknown Question',
           questionType: 'text',
@@ -154,7 +154,7 @@ exports.getAllResponses = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     // Get unique user IDs from responses
-    const responses = await SurveyResponse.find().distinct('employeeId');
+    const responses = await SurveyResponse.find().distinct('userId');
     res.json(responses);
   } catch (error) {
     res.status(500).json({ message: error.message });

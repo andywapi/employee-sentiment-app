@@ -59,7 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
     submitButton: document.querySelector('button[type="submit"]'),
     weatherDisplay: document.getElementById('weather-display'),
     progressIndicator: document.getElementById('progress-indicator'),
-    navigationButtons: document.getElementById('navigation-buttons')
+    navigationButtons: document.getElementById('navigation-buttons'),
+    employeeIdInput: document.getElementById('userId')
   };
 
   /**
@@ -245,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Loading questions...');
       showLoading(DOM.questionsDiv);
       
-      const url = window.location.origin + '/api/questions?active=true';
+      const url = window.location.origin + '/api/questions';
       console.log('Fetching questions from:', url);
       console.log('Current window.location:', window.location);
       console.log('Current window.location.origin:', window.location.origin);
@@ -279,8 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Sort questions by order if available
       STATE.questions = questions.sort((a, b) => (a.order || 9999) - (b.order || 9999));
-      STATE.currentQuestionIndex = 0;
+      STATE.currentQuestionIndex = -1; // Start at employee ID input
       STATE.responses = new Map();
+      STATE.employeeId = ''; // Reset employee ID
       
       renderCurrentQuestion();
       renderProgressIndicator();
@@ -373,9 +375,48 @@ document.addEventListener('DOMContentLoaded', () => {
     
     DOM.questionsDiv.innerHTML = ''; // Clear existing questions
     
+    // Handle employee ID input screen
+    if (STATE.currentQuestionIndex === -1) {
+      // Show the employee ID form group and hide questions
+      const formGroup = DOM.employeeIdInput.closest('.form-group');
+      if (formGroup) {
+        formGroup.style.display = 'block';
+      }
+      
+      // Update label and help text
+      const label = formGroup.querySelector('label');
+      if (label) {
+        label.textContent = translations[STATE.currentLanguage].employeeIdPrompt || 'Please enter your Employee ID';
+      }
+      
+      // Add help text if it doesn't exist
+      let helpText = formGroup.querySelector('.help-text');
+      if (!helpText) {
+        helpText = document.createElement('p');
+        helpText.className = 'help-text';
+        formGroup.appendChild(helpText);
+      }
+      helpText.textContent = translations[STATE.currentLanguage].employeeIdHelp || 'This helps us prevent duplicate submissions';
+      
+      // Update input value and add event listener
+      DOM.employeeIdInput.value = STATE.employeeId;
+      DOM.employeeIdInput.addEventListener('input', (e) => {
+        STATE.employeeId = e.target.value;
+      });
+      
+      return;
+    } else {
+      // Hide the employee ID form group when showing questions
+      const formGroup = DOM.employeeIdInput.closest('.form-group');
+      if (formGroup) {
+        formGroup.style.display = 'none';
+      }
+    }
+    
     if (STATE.questions.length === 0) return;
     
     const question = STATE.questions[STATE.currentQuestionIndex];
+    if (!question) return;
     
     const questionDiv = document.createElement('div');
     questionDiv.className = 'question';
@@ -586,52 +627,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevButton = document.createElement('button');
     prevButton.type = 'button';
     prevButton.className = 'nav-button prev-button';
-    prevButton.dataset.lang = 'previous';
+    prevButton.textContent = 'Previous';
     
-    // Set button text using our simple language system
-    if (window.SimpleLanguage) {
-      prevButton.textContent = SimpleLanguage.translateUI('previous');
-    } else {
-      prevButton.textContent = STATE.currentLanguage === 'en' ? 'Previous' : 'Anterior';
+    // Disable previous button if we're on the first question or employee ID screen
+    if (STATE.currentQuestionIndex <= 0) {
+      prevButton.disabled = true;
     }
     
-    prevButton.disabled = STATE.currentQuestionIndex === 0;
     prevButton.addEventListener('click', goToPreviousQuestion);
     navContainer.appendChild(prevButton);
     
-    // Next/Submit button
+    // Next button
     const nextButton = document.createElement('button');
     nextButton.type = 'button';
     
-    // Change button text and function if it's the last question
-    const isLastQuestion = STATE.currentQuestionIndex === STATE.questions.length - 1;
-    
-    if (isLastQuestion) {
+    // If we're on the last question, make it a submit button
+    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
       nextButton.className = 'nav-button submit-button';
-      nextButton.dataset.lang = 'submit';
-      
-      if (window.SimpleLanguage) {
-        nextButton.textContent = SimpleLanguage.translateUI('submit');
-      } else {
-        nextButton.textContent = translations[STATE.currentLanguage]?.submit || 'Submit';
-      }
-      
+      nextButton.textContent = 'Submit';
       nextButton.addEventListener('click', handleSubmitFromNavigation);
     } else {
       nextButton.className = 'nav-button next-button';
-      nextButton.dataset.lang = 'next';
-      
-      if (window.SimpleLanguage) {
-        nextButton.textContent = SimpleLanguage.translateUI('next');
-      } else {
-        nextButton.textContent = STATE.currentLanguage === 'en' ? 'Next' : 'Siguiente';
-      }
-      
+      nextButton.textContent = 'Next';
       nextButton.addEventListener('click', goToNextQuestion);
     }
     
     navContainer.appendChild(nextButton);
-    
     DOM.navigationButtons.appendChild(navContainer);
   }
   
@@ -639,49 +660,26 @@ document.addEventListener('DOMContentLoaded', () => {
    * Go to the previous question
    */
   function goToPreviousQuestion() {
-    if (STATE.currentQuestionIndex > 0) {
-      STATE.currentQuestionIndex--;
-      renderCurrentQuestion();
-      renderProgressIndicator();
-      renderNavigation();
-      
-      // Apply translations after navigation
-      if (window.SimpleLanguage) {
-        setTimeout(() => {
-          SimpleLanguage.updateUI();
-          console.log('Applied translations after previous navigation');
-        }, 50);
-      }
-    }
-  }
-  
-  /**
-   * Go to the next question
-   */
-  function goToNextQuestion() {
-    const currentQuestion = STATE.questions[STATE.currentQuestionIndex];
+    // If we're on the employee ID input screen, do nothing
+    if (STATE.currentQuestionIndex === -1) return;
     
-    // Validate the current question has a response before proceeding
-    if (!validateCurrentQuestion(currentQuestion)) {
+    // Validate current question before proceeding
+    const question = STATE.questions[STATE.currentQuestionIndex];
+    if (!validateCurrentQuestion(question)) {
       return;
     }
     
-    if (STATE.currentQuestionIndex < STATE.questions.length - 1) {
-      STATE.currentQuestionIndex++;
-      renderCurrentQuestion();
-      renderProgressIndicator();
-      renderNavigation();
-      
-      // Apply translations after navigation
-      if (window.SimpleLanguage) {
-        setTimeout(() => {
-          SimpleLanguage.updateUI();
-          console.log('Applied translations after next navigation');
-        }, 50);
-      }
-      
-      // Scroll to top of the question
-      DOM.questionsDiv.scrollIntoView({ behavior: 'smooth' });
+    STATE.currentQuestionIndex--;
+    renderCurrentQuestion();
+    renderProgressIndicator();
+    renderNavigation();
+    
+    // Apply translations after navigation
+    if (window.SimpleLanguage) {
+      setTimeout(() => {
+        SimpleLanguage.updateUI();
+        console.log('Applied translations after previous navigation');
+      }, 50);
     }
   }
   
@@ -820,20 +818,20 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleSubmitFromNavigation() {
     // Check if we're on the employee ID input screen
     if (STATE.currentQuestionIndex === -1) {
-      const employeeIdInput = document.querySelector('#employee-id');
-      if (!employeeIdInput || !employeeIdInput.value.trim()) {
-        showError('Please enter your Employee ID');
+      if (!DOM.employeeIdInput || !DOM.employeeIdInput.value.trim()) {
+        showError(translations[STATE.currentLanguage].employeeIdRequired || 'Please enter your Employee ID');
         return;
       }
-      STATE.employeeId = employeeIdInput.value.trim();
+      STATE.employeeId = DOM.employeeIdInput.value.trim();
 
       // Check if this employee has submitted today
       const lastSubmission = localStorage.getItem(`lastSubmission_${STATE.employeeId}`);
       if (lastSubmission) {
         const lastDate = new Date(lastSubmission);
         const now = new Date();
+        // If last submission was within 24 hours, show message
         if (now - lastDate < 24 * 60 * 60 * 1000) {
-          showError('You have already submitted a survey in the last 24 hours. Please try again tomorrow.');
+          showError(translations[STATE.currentLanguage].alreadySubmitted || 'You have already submitted a survey in the last 24 hours. Please try again tomorrow.');
           return;
         }
       }
@@ -859,49 +857,55 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Validate all questions have responses
       const unansweredQuestions = STATE.questions.filter(q => !STATE.responses.has(q._id));
-      
       if (unansweredQuestions.length > 0) {
-        showError(STATE.currentLanguage === 'en' ? 
-          'Please answer all questions before submitting.' : 
-          'Por favor responda todas las preguntas antes de enviar.');
+        showError(translations[STATE.currentLanguage].allQuestionsRequired || 'Please answer all questions');
         return;
       }
-      
-      // Disable navigation buttons to prevent multiple submissions
+
+      // Disable navigation buttons during submission
       const navButtons = document.querySelectorAll('.nav-button');
       navButtons.forEach(button => {
         button.disabled = true;
         if (button.classList.contains('submit-button')) {
-          button.textContent = STATE.currentLanguage === 'en' ? 'Submitting...' : 'Enviando...';
+          button.textContent = translations[STATE.currentLanguage].loading || 'Loading...';
         }
       });
       
+      // Create an array of promises for submitting each response
       const promises = [];
       
-      // Send each response to the API
-      STATE.questions.forEach(question => {
-        const response = STATE.responses.get(question._id);
-        
+      STATE.questions.forEach((question, index) => {
+        const response = STATE.responses.get(index);
         if (!response) return;
         
-        // Create the appropriate payload based on question type
         const payload = {
-          employeeId: STATE.employeeId,
-          questionId: question._id
+          questionId: question._id,
+          userId: STATE.employeeId // Ensure employee ID is included
         };
         
-        if (question.questionType === 'text') {
-          payload.responseText = response;
-        } else {
+        // Add the appropriate response field based on question type
+        if (question.questionType === 'multipleChoice') {
           payload.selectedOption = response;
+        } else {
+          payload.responseText = response;
         }
         
-        // Send the response
+        console.log('Submitting response payload:', payload); // Debug log
+        
         promises.push(
           fetch(`${API_CONFIG.BASE_URL}/responses`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders()
+            },
             body: JSON.stringify(payload)
+          }).then(async (response) => {
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Failed to submit response');
+            }
+            return response.json();
           })
         );
       });
@@ -909,13 +913,18 @@ document.addEventListener('DOMContentLoaded', () => {
       // Wait for all responses to be submitted
       await Promise.all(promises);
       
+      // Save submission timestamp
+      localStorage.setItem('lastSurveySubmission', new Date().toISOString());
+      
       // Show the confirmation page
       STATE.showConfirmation = true;
       renderCurrentQuestion();
       
+      showSuccess(translations[STATE.currentLanguage].submissionSuccess || 'Responses submitted successfully');
+      
     } catch (error) {
       console.error('Error submitting responses:', error);
-      showError(translations[STATE.currentLanguage].failedToSubmit || 'Failed to submit responses. Please try again.');
+      showError(error.message || translations[STATE.currentLanguage].failedToSubmit || 'Failed to submit responses. Please try again.');
       
       // Re-enable navigation buttons
       const navButtons = document.querySelectorAll('.nav-button');
@@ -1027,6 +1036,51 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
       errorMessage.remove();
     }, 5000);
+  }
+
+  /**
+   * Go to the next question
+   */
+  function goToNextQuestion() {
+    // If we're on the last question, handle submission
+    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
+      handleSubmitFromNavigation();
+      return;
+    }
+    
+    // Handle employee ID validation
+    if (STATE.currentQuestionIndex === -1) {
+      const employeeId = STATE.employeeId.trim();
+      if (!employeeId) {
+        showError(translations[STATE.currentLanguage].employeeIdRequired || 'Employee ID is required');
+        return;
+      }
+      
+      // Check if it's a reasonable length (e.g., between 3 and 20 characters)
+      if (employeeId.length < 3 || employeeId.length > 20) {
+        showError(translations[STATE.currentLanguage].employeeIdInvalid || 'Employee ID must be between 3 and 20 characters');
+        return;
+      }
+    } else if (STATE.currentQuestionIndex >= 0) {
+      // Validate current question before proceeding
+      const question = STATE.questions[STATE.currentQuestionIndex];
+      if (!validateCurrentQuestion(question)) {
+        return;
+      }
+    }
+    
+    STATE.currentQuestionIndex++;
+    renderCurrentQuestion();
+    renderProgressIndicator();
+    renderNavigation();
+    
+    // Apply translations after navigation
+    if (window.SimpleLanguage) {
+      setTimeout(() => {
+        SimpleLanguage.updateUI();
+        console.log('Applied translations after next navigation');
+      }, 50);
+    }
   }
   
   // Initialize the application

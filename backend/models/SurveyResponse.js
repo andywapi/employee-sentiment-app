@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const SurveyResponseSchema = new mongoose.Schema({
-  employeeId: {
+  userId: {
     type: String,
     required: true,
     trim: true
@@ -9,10 +9,6 @@ const SurveyResponseSchema = new mongoose.Schema({
   questionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SurveyQuestion',
-    required: true
-  },
-  userId: {
-    type: String,
     required: true
   },
   responseText: {
@@ -29,6 +25,6 @@ const SurveyResponseSchema = new mongoose.Schema({
 });
 
 // Create a compound index to prevent duplicate submissions
-SurveyResponseSchema.index({ employeeId: 1, questionId: 1 }, { unique: true });
+SurveyResponseSchema.index({ userId: 1, questionId: 1 }, { unique: true });
 
 module.exports = mongoose.model('SurveyResponse', SurveyResponseSchema);

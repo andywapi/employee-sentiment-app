@@ -128,10 +128,24 @@
     .weather-display .icon {
       font-size: 18px;
     }
+    .back-to-survey-button {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 2px solid white;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-top: 10px;
+      transition: background-color 0.3s ease;
+    }
+    .back-to-survey-button:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
   </style>
 </head>
 <body>
-    <div class="version-info">v1.0.0</div>
+    <div class="version-info">v1.1.0</div>
   <div class="language-toggle">
     <label for="language-select">Language:</label>
     <select id="language-select">
@@ -143,6 +157,7 @@
   <div class="container">
     <header>
       <h1>Employee Sentiment Survey - Admin Panel</h1>
+      <button id="back-to-survey-btn" class="back-to-survey-button">← Back to Survey</button>
     </header>
     
     <main>

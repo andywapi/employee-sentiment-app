@@ -21,6 +21,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path.includes('/responses')) {
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
+
 // CORS configuration for API requests
 app.use((req, res, next) => {
   // Allow requests from any origin in development and from Render in production

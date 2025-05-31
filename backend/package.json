@@ -1,6 +1,6 @@
 {
   "name": "employee-sentiment-app-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Backend for Employee Sentiment App",
   "main": "server.js",
   "scripts": {

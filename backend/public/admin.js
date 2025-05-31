@@ -54,7 +54,10 @@ const DOM = {
   // Question ordering
   reorderModeBtn: document.getElementById('reorder-mode-btn'),
   saveOrderBtn: document.getElementById('save-order-btn'),
-  cancelOrderBtn: document.getElementById('cancel-order-btn')
+  cancelOrderBtn: document.getElementById('cancel-order-btn'),
+  
+  // Navigation
+  backToSurveyBtn: document.getElementById('back-to-survey-btn')
 };
 
 /**
@@ -193,6 +196,13 @@ function setupEventListeners() {
   }
   if (DOM.cancelOrderBtn) {
     DOM.cancelOrderBtn.addEventListener('click', cancelReorderMode);
+  }
+  
+  // Back to survey navigation
+  if (DOM.backToSurveyBtn) {
+    DOM.backToSurveyBtn.addEventListener('click', () => {
+      window.location.href = '/';
+    });
   }
 }
 
@@ -453,7 +463,7 @@ function renderQuestions(questions) {
     questionsContainer.parentNode.insertBefore(orderingButtons, questionsContainer.nextSibling);
   }
   
-  questions.forEach(question => {
+  questions.forEach((question, index) => {
     const questionItem = document.createElement('div');
     questionItem.className = 'question-item';
     questionItem.dataset.id = question._id;
@@ -475,8 +485,8 @@ function renderQuestions(questions) {
       `;
     }
     
-    // Add order number display
-    const orderDisplay = `<div class="question-order">${question.order || '-'}</div>`;
+    // Display sequential number (index + 1) instead of database order value
+    const orderDisplay = `<div class="question-order">${index + 1}</div>`;
     
     questionItem.innerHTML = `
       ${orderDisplay}
