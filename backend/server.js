@@ -17,14 +17,32 @@ const API_PREFIX = process.env.API_PREFIX || '/api';
 /**
  * Configure Express middleware
  */
+// Trust proxy for accurate IP addresses (important for deployment)
+app.set('trust proxy', true);
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// IP tracking middleware
+app.use((req, res, next) => {
+  // Get client IP address
+  const clientIP = req.ip || 
+                   req.connection.remoteAddress || 
+                   req.socket.remoteAddress ||
+                   (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                   req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                   req.headers['x-real-ip'];
+  
+  req.clientIP = clientIP;
+  next();
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
   if (req.method === 'POST' && req.path.includes('/responses')) {
     console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Client IP:', req.clientIP);
   }
   next();
 });

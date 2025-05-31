@@ -26,7 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
       submit: 'Submit',
       employeeIdPrompt: 'Please enter your Employee ID',
       employeeIdHelp: 'This helps us prevent duplicate submissions',
-      nextButton: 'Next'
+      nextButton: 'Next',
+      duplicateTitle: 'Survey Already Completed',
+      duplicateMessage: 'Thank you for your interest! This survey has already been completed from this device. Each employee can only submit one response to ensure data accuracy.',
+      duplicateContact: 'If you believe this is an error, please contact your administrator.',
+      adminPanel: 'Admin Panel'
     },
     es: {
       noQuestionsMessage: 'No se encontraron preguntas.',
@@ -35,7 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
       submit: 'Enviar',
       employeeIdPrompt: 'Por favor, ingrese su ID de empleado',
       employeeIdHelp: 'Esto nos ayuda a prevenir envíos duplicados',
-      nextButton: 'Siguiente'
+      nextButton: 'Siguiente',
+      duplicateTitle: 'La encuesta ya ha sido completada',
+      duplicateMessage: '¡Gracias por su interés! Esta encuesta ya ha sido completada desde este dispositivo. Cada empleado solo puede enviar una respuesta para garantizar la precisión de los datos.',
+      duplicateContact: 'Si cree que esto es un error, por favor comuníquese con su administrador.',
+      adminPanel: 'Panel de administración'
     }
   };
   
@@ -48,7 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
     currentQuestionIndex: -1, // Start at -1 for employee ID input
     responses: new Map(),
     showConfirmation: false,
-    employeeId: ''
+    employeeId: '',
+    deviceFingerprint: null,
+    surveyCompleted: false
   };
   
   // DOM Elements
@@ -139,6 +149,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get weather data
     getWeatherData();
+    
+    // Generate device fingerprint
+    STATE.deviceFingerprint = generateDeviceFingerprint();
+    
+    // Check for duplicate submission
+    checkDuplicateSubmission();
   }
   
   /**
@@ -880,7 +896,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const payload = {
           questionId: question._id,
-          userId: STATE.employeeId // Ensure employee ID is included
+          userId: STATE.employeeId, // Ensure employee ID is included
+          deviceFingerprint: STATE.deviceFingerprint, // Add device fingerprint
+          submissionTimestamp: new Date().toISOString()
         };
         
         // Add the appropriate response field based on question type
@@ -913,8 +931,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Wait for all responses to be submitted
       await Promise.all(promises);
       
+      // Mark survey as completed
+      markSurveyCompleted(STATE.deviceFingerprint);
+      
       // Save submission timestamp
       localStorage.setItem('lastSurveySubmission', new Date().toISOString());
+      localStorage.setItem(`lastSubmission_${STATE.employeeId}`, new Date().toISOString());
       
       // Show the confirmation page
       STATE.showConfirmation = true;
@@ -1082,7 +1104,154 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 50);
     }
   }
-  
+
+  /**
+   * Generate a unique device fingerprint for duplicate prevention
+   * @returns {string} Base64 encoded device fingerprint
+   */
+  function generateDeviceFingerprint() {
+    try {
+      // Create canvas fingerprint
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('Survey fingerprint', 2, 2);
+      
+      // Collect device characteristics
+      const fingerprint = {
+        screen: `${screen.width}x${screen.height}x${screen.colorDepth}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        language: navigator.language,
+        languages: navigator.languages ? navigator.languages.join(',') : '',
+        platform: navigator.platform,
+        cookieEnabled: navigator.cookieEnabled,
+        doNotTrack: navigator.doNotTrack,
+        canvas: canvas.toDataURL(),
+        userAgent: navigator.userAgent.slice(0, 100), // Truncated for privacy
+        hardwareConcurrency: navigator.hardwareConcurrency || 0,
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+        timestamp: Date.now()
+      };
+      
+      // Convert to base64 string
+      return btoa(JSON.stringify(fingerprint)).slice(0, 64); // Limit length
+    } catch (error) {
+      console.error('Error generating fingerprint:', error);
+      // Fallback fingerprint
+      return btoa(`${Date.now()}-${Math.random()}`).slice(0, 32);
+    }
+  }
+
+  /**
+   * Check if survey has already been completed on this device
+   * @returns {boolean} True if survey was already completed
+   */
+  function checkLocalCompletion() {
+    const completed = localStorage.getItem('survey_completed');
+    const completedDate = localStorage.getItem('survey_completed_date');
+    
+    if (completed && completedDate) {
+      const daysSinceCompletion = (Date.now() - parseInt(completedDate)) / (1000 * 60 * 60 * 24);
+      // Allow retaking after 30 days (configurable)
+      if (daysSinceCompletion < 30) {
+        return true;
+      } else {
+        // Clear old completion data
+        localStorage.removeItem('survey_completed');
+        localStorage.removeItem('survey_completed_date');
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check with server if this device/IP has already submitted a survey
+   * @param {string} fingerprint - Device fingerprint
+   * @returns {Promise<boolean>} True if already submitted
+   */
+  async function checkServerCompletion(fingerprint) {
+    try {
+      const response = await fetch('/api/check-submission', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({ fingerprint })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        return result.alreadySubmitted;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking server completion:', error);
+      return false; // Allow survey if check fails
+    }
+  }
+
+  /**
+   * Mark survey as completed locally and on server
+   * @param {string} fingerprint - Device fingerprint
+   */
+  function markSurveyCompleted(fingerprint) {
+    // Mark locally
+    localStorage.setItem('survey_completed', 'true');
+    localStorage.setItem('survey_completed_date', Date.now().toString());
+    
+    // Update state
+    STATE.surveyCompleted = true;
+  }
+
+  /**
+   * Show duplicate submission message
+   */
+  function showDuplicateSubmissionMessage() {
+    const container = document.querySelector('.container');
+    container.innerHTML = `
+      <div class="duplicate-submission-message">
+        <div class="icon">⚠️</div>
+        <h2 data-i18n="duplicateTitle">Survey Already Completed</h2>
+        <p data-i18n="duplicateMessage">
+          Thank you for your interest! This survey has already been completed from this device. 
+          Each employee can only submit one response to ensure data accuracy.
+        </p>
+        <p data-i18n="duplicateContact">
+          If you believe this is an error, please contact your administrator.
+        </p>
+        <div class="duplicate-actions">
+          <button onclick="window.location.href='/admin.html'" class="admin-link" data-i18n="adminPanel">
+            Admin Panel
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Apply translations
+    updateTranslations();
+  }
+
+  /**
+   * Check for duplicate submission
+   */
+  async function checkDuplicateSubmission() {
+    // Check local completion
+    if (checkLocalCompletion()) {
+      showDuplicateSubmissionMessage();
+      return;
+    }
+    
+    // Check server completion
+    const fingerprint = STATE.deviceFingerprint;
+    if (await checkServerCompletion(fingerprint)) {
+      showDuplicateSubmissionMessage();
+      return;
+    }
+  }
+
   // Initialize the application
   init();
 });

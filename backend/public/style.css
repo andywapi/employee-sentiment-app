@@ -1141,3 +1141,67 @@ input[type="checkbox"]:checked::before {
 .submit-button:hover {
   background-color: #45a049;
 }
+
+/* Duplicate Submission Message */
+.duplicate-submission-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-xl);
+  margin: var(--spacing-xl) auto;
+  max-width: 600px;
+  background-color: var(--apple-white);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+.duplicate-submission-message .icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-lg);
+  color: var(--apple-red);
+  background-color: rgba(255, 59, 48, 0.1);
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.duplicate-submission-message h2 {
+  color: var(--apple-red);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-large);
+  font-weight: 600;
+}
+
+.duplicate-submission-message p {
+  color: var(--apple-gray);
+  margin-bottom: var(--spacing-md);
+  line-height: 1.6;
+  max-width: 500px;
+}
+
+.duplicate-actions {
+  margin-top: var(--spacing-lg);
+}
+
+.duplicate-actions .admin-link {
+  background-color: var(--apple-blue);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: var(--font-medium);
+  font-weight: 500;
+  transition: background-color var(--transition-fast);
+  border: none;
+  cursor: pointer;
+}
+
+.duplicate-actions .admin-link:hover {
+  background-color: #0062cc;
+}

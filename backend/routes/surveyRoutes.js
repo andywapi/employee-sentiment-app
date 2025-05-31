@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const questionController = require('../controllers/questionController');
 const responseController = require('../controllers/responseController');
+const submissionController = require('../controllers/submissionController');
 const axios = require('axios');
 
 // Question Routes
@@ -17,6 +18,11 @@ router.get('/responses/user/:userId', responseController.getUserResponses);
 router.get('/responses', responseController.getAllResponses);
 router.get('/responses/users', responseController.getUsers);
 router.get('/responses/pareto', responseController.getParetoAnalysis);
+
+// Submission Tracking Routes
+router.post('/check-submission', submissionController.checkSubmission);
+router.post('/record-submission', submissionController.recordSubmission);
+router.get('/submission-stats', submissionController.getSubmissionStats);
 
 // Weather proxy route to avoid CORS issues
 router.get('/weather', async (req, res) => {

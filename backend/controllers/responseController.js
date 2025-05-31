@@ -1,9 +1,11 @@
 const SurveyResponse = require('../models/SurveyResponse');
 const SurveyQuestion = require('../models/SurveyQuestion');
+const SubmissionTracker = require('../models/SubmissionTracker');
 
 exports.submitResponse = async (req, res) => {
   try {
-    const { questionId, userId, responseText, selectedOption } = req.body;
+    const { questionId, userId, responseText, selectedOption, deviceFingerprint, submissionTimestamp } = req.body;
+    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
     
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
@@ -20,13 +22,18 @@ exports.submitResponse = async (req, res) => {
       userId,
       questionType: question.questionType,
       responseText,
-      selectedOption
+      selectedOption,
+      deviceFingerprint,
+      clientIP
     });
 
     // Create response object based on question type
     const responseData = {
       questionId,
       userId,
+      deviceFingerprint,
+      submissionTimestamp: submissionTimestamp || new Date(),
+      ipAddress: clientIP
     };
 
     // Add the appropriate response field based on question type
@@ -43,6 +50,36 @@ exports.submitResponse = async (req, res) => {
     const response = new SurveyResponse(responseData);
 
     await response.save();
+    
+    // Record submission in tracker (only once per survey completion)
+    if (deviceFingerprint) {
+      try {
+        const existingTracker = await SubmissionTracker.findOne({
+          deviceFingerprint,
+          submissionDate: {
+            $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+          }
+        });
+
+        if (!existingTracker) {
+          const submissionTracker = new SubmissionTracker({
+            deviceFingerprint,
+            ipAddress: clientIP,
+            userAgent: req.get('User-Agent'),
+            employeeId: userId,
+            submissionDate: new Date(),
+            responseCount: 1,
+            lastSubmissionDate: new Date()
+          });
+
+          await submissionTracker.save();
+        }
+      } catch (trackerError) {
+        console.error('Error saving submission tracker:', trackerError);
+        // Don't fail the response submission if tracker fails
+      }
+    }
+    
     console.log('Response saved:', response);
     res.status(201).json(response);
   } catch (error) {
