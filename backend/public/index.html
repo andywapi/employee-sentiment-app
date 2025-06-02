@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Employee Sentiment Survey</title>
+  <meta name="version" content="1.2.0">
+  <title>Employee Survey</title>
   <link rel="stylesheet" href="/style.css">
   <!-- Original scripts -->
   <script src="/i18n.js"></script>
@@ -12,41 +13,254 @@
   <script src="/direct-translations.js"></script>
   <script src="/language-patch.js"></script>
   <style>
+    body {
+      margin: 0;
+      padding: 0;
+      position: relative;
+      min-height: 100vh;
+    }
+    
     .language-toggle {
-      position: absolute;
-      top: 10px;
-      right: 10px;
+      position: fixed;
+      top: 15px;
+      right: 15px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      z-index: 1000;
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(0, 0, 0, 0.1);
     }
+    
     .language-toggle select {
-      padding: 5px;
+      padding: 4px 8px;
       border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      background-color: white;
+      min-width: 80px;
+    }
+    
+    .weather-display {
+      position: fixed;
+      top: 15px;
+      left: 15px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
+    
+    .weather-display .icon {
+      font-size: 16px;
+    }
+    
+    .version-info {
+      position: fixed;
+      top: 70px;
+      left: 15px;
+      font-size: 11px;
+      color: #666;
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      font-weight: 500;
+    }
+    
+    /* Status message styles */
+    .status-message {
+      margin: 15px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      display: none;
+    }
+    
+    .status-message.error {
+      background-color: #fee;
+      color: #c33;
+      border: 1px solid #fcc;
+    }
+    
+    .status-message.success {
+      background-color: #efe;
+      color: #363;
+      border: 1px solid #cfc;
+    }
+    
+    /* Question display styles */
+    .question-container {
+      margin: 20px 0;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
       border: 1px solid #ddd;
     }
-    .weather-display {
-      position: absolute;
-      top: 10px;
-      left: 10px;
+    
+    .question-container h2 {
+      margin: 0 0 15px 0;
+      color: #333;
+      font-size: 18px;
+    }
+    
+    .question-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .option-label {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 14px;
-      background-color: rgba(255, 255, 255, 0.8);
-      padding: 5px 10px;
+      gap: 8px;
+      padding: 8px;
+      background: white;
+      border: 1px solid #ccc;
       border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: background-color 0.2s;
     }
-    .weather-display .icon {
-      font-size: 18px;
+    
+    .option-label:hover {
+      background-color: #f0f0f0;
+    }
+    
+    .option-label input[type="radio"] {
+      margin: 0;
+    }
+    
+    .nav-button {
+      padding: 10px 20px;
+      background: #007cba;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 10px 5px;
+    }
+    
+    .nav-button:hover {
+      background: #005a87;
+    }
+    
+    .error-message {
+      background: #fee;
+      color: #c33;
+      border: 1px solid #fcc;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    
+    /* Ensure container has proper spacing from top */
+    .container {
+      margin-top: 120px;
+      padding: 20px;
+    }
+    
+    /* Ensure header doesn't overlap with fixed elements */
+    .container header {
+      margin-bottom: 30px;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .language-toggle {
+        top: 10px;
+        right: 10px;
+        padding: 6px 10px;
+      }
+      
+      .weather-display {
+        top: 10px;
+        left: 10px;
+        padding: 6px 10px;
+      }
+      
+      .version-info {
+        top: 60px;
+        font-size: 10px;
+        padding: 3px 8px;
+      }
+      
+      .container {
+        margin-top: 100px;
+        padding: 15px;
+      }
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 80px auto 20px auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .duplicate-submission-message {
+      text-align: center;
+      padding: 40px 20px;
+      background-color: #f8f9fa;
+      border-radius: 12px;
+      border: 2px solid #e9ecef;
+      margin: 20px 0;
+    }
+    
+    .duplicate-submission-message h2 {
+      color: #495057;
+      margin-bottom: 15px;
+      font-size: 24px;
+    }
+    
+    .duplicate-submission-message p {
+      color: #6c757d;
+      margin-bottom: 25px;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    
+    .duplicate-actions {
+      margin-top: 20px;
+    }
+    
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    
+    .btn-secondary:hover {
+      background-color: #5a6268;
     }
   </style>
 </head>
 <body>
-    <div class="version-info">v1.1.0</div>
+    <div class="version-info">v1.2.0</div>
+  <!-- Weather display -->
+  <div id="weather-display" class="weather-display">
+    <span class="icon">🌤️</span>
+    <span class="temp">--°C</span>
+  </div>
+  
   <div class="language-toggle">
-    <label for="language-select" data-i18n="languageLabel">Language:</label>
     <select id="language-select">
       <option value="en">English</option>
       <option value="es">Español</option>
@@ -54,21 +268,13 @@
   </div>
   <div class="container">
     <header>
-      <h1 data-i18n="appTitle">Employee Sentiment Survey</h1>
-      <div class="status-message">
-        <p><strong data-i18n="statusLabel">Status:</strong> <span data-i18n="statusMessage">Frontend successfully loaded! If you see this message, the static file serving is working correctly.</span></p>
-      </div>
+      <h1 data-i18n="appTitle">Employee Survey</h1>
       <div class="admin-link">
         <a href="/admin.html" data-i18n="adminLink">Admin Panel</a>
       </div>
     </header>
     <main>
       <form id="survey-form">
-        <div class="form-group">
-          <label for="userId">User ID:</label>
-          <input type="text" id="userId" name="userId" required />
-        </div>
-        
         <!-- Progress indicator for subway-style visualization -->
         <div id="progress-indicator" class="progress-container"></div>
         
@@ -78,7 +284,7 @@
         <!-- Navigation buttons for moving between questions -->
         <div id="navigation-buttons" class="navigation-buttons"></div>
         
-        <button type="submit">Submit</button>
+        <button type="submit" style="display: none;">Submit</button>
       </form>
     </main>
   </div>

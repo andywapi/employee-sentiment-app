@@ -9,8 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize the i18n system
   if (window.i18n) {
     i18n.initLanguage();
-    i18n.updatePageTranslations();
   }
+  
   // API configuration
   const API_CONFIG = {
     BASE_URL: window.location.origin + '/api',
@@ -24,26 +24,44 @@ document.addEventListener('DOMContentLoaded', () => {
       failedToLoad: 'Failed to load questions. Please try again.',
       loading: 'Loading...',
       submit: 'Submit',
-      employeeIdPrompt: 'Please enter your Employee ID',
-      employeeIdHelp: 'This helps us prevent duplicate submissions',
       nextButton: 'Next',
+      previous: 'Previous',
       duplicateTitle: 'Survey Already Completed',
       duplicateMessage: 'Thank you for your interest! This survey has already been completed from this device. Each employee can only submit one response to ensure data accuracy.',
       duplicateContact: 'If you believe this is an error, please contact your administrator.',
-      adminPanel: 'Admin Panel'
+      adminPanel: 'Admin Panel',
+      appTitle: 'Employee Survey',
+      confirmationMessage: 'Thank you for completing the survey',
+      startNewSurvey: 'Start a new survey',
+      allQuestionsRequired: 'Please answer all questions',
+      failedToSubmit: 'Failed to submit responses. Please try again.',
+      submissionSuccess: 'Responses submitted successfully',
+      adminLink: 'Admin Panel',
+      duplicateSubmissionTitle: "Survey Already Completed",
+      duplicateSubmissionMessage: "You have already completed this survey. Thank you for your participation!",
+      allowNewSubmission: "Allow New Submission"
     },
     es: {
       noQuestionsMessage: 'No se encontraron preguntas.',
       failedToLoad: 'Error al cargar las preguntas. Por favor, intente de nuevo.',
       loading: 'Cargando...',
       submit: 'Enviar',
-      employeeIdPrompt: 'Por favor, ingrese su ID de empleado',
-      employeeIdHelp: 'Esto nos ayuda a prevenir envíos duplicados',
       nextButton: 'Siguiente',
+      previous: 'Anterior',
       duplicateTitle: 'La encuesta ya ha sido completada',
       duplicateMessage: '¡Gracias por su interés! Esta encuesta ya ha sido completada desde este dispositivo. Cada empleado solo puede enviar una respuesta para garantizar la precisión de los datos.',
       duplicateContact: 'Si cree que esto es un error, por favor comuníquese con su administrador.',
-      adminPanel: 'Panel de administración'
+      adminPanel: 'Panel de administración',
+      appTitle: 'Encuesta de Empleado',
+      confirmationMessage: 'Gracias por completar la encuesta',
+      startNewSurvey: 'Comenzar una nueva encuesta',
+      allQuestionsRequired: 'Por favor responda todas las preguntas',
+      failedToSubmit: 'Error al enviar respuestas. Por favor, inténtelo de nuevo.',
+      submissionSuccess: 'Respuestas enviadas con éxito',
+      adminLink: 'Panel de administración',
+      duplicateSubmissionTitle: "Encuesta Ya Completada",
+      duplicateSubmissionMessage: "Ya has completado esta encuesta. ¡Gracias por tu participación!",
+      allowNewSubmission: "Permitir Nueva Respuesta"
     }
   };
   
@@ -53,10 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     weatherData: null,
     temperatureUnit: localStorage.getItem('temperatureUnit') || 'C', // Default to Celsius
     questions: [],
-    currentQuestionIndex: -1, // Start at -1 for employee ID input
+    currentQuestionIndex: 0, // Start at 0 for first question
     responses: new Map(),
     showConfirmation: false,
-    employeeId: '',
     deviceFingerprint: null,
     surveyCompleted: false
   };
@@ -69,9 +86,24 @@ document.addEventListener('DOMContentLoaded', () => {
     submitButton: document.querySelector('button[type="submit"]'),
     weatherDisplay: document.getElementById('weather-display'),
     progressIndicator: document.getElementById('progress-indicator'),
-    navigationButtons: document.getElementById('navigation-buttons'),
-    employeeIdInput: document.getElementById('userId')
+    navigationButtons: document.getElementById('navigation-buttons')
   };
+
+  // Debug DOM elements
+  console.log('DOM Elements found:', {
+    languageSelect: !!DOM.languageSelect,
+    form: !!DOM.form,
+    questionsDiv: !!DOM.questionsDiv,
+    submitButton: !!DOM.submitButton,
+    weatherDisplay: !!DOM.weatherDisplay,
+    progressIndicator: !!DOM.progressIndicator,
+    navigationButtons: !!DOM.navigationButtons
+  });
+
+  // Additional debugging for specific elements
+  console.log('Questions div element:', DOM.questionsDiv);
+  console.log('Navigation buttons element:', DOM.navigationButtons);
+  console.log('App title element:', document.querySelector('[data-i18n="appTitle"]'));
 
   /**
    * Helper function to get auth headers for API requests
@@ -82,9 +114,15 @@ document.addEventListener('DOMContentLoaded', () => {
       'Content-Type': 'application/json'
     };
     
-    // Add auth header if credentials exist
+    // Add admin token for protected routes
+    const adminToken = localStorage.getItem('adminToken');
+    if (adminToken) {
+      headers['Authorization'] = `Bearer ${adminToken}`;
+    }
+    
+    // Fallback to basic auth credentials if available
     const credentials = localStorage.getItem('auth_credentials');
-    if (credentials) {
+    if (credentials && !adminToken) {
       headers['Authorization'] = `Basic ${credentials}`;
     }
     
@@ -109,221 +147,149 @@ document.addEventListener('DOMContentLoaded', () => {
   /**
    * Initialize the application
    */
-  function init() {
-    // Check authentication
-    checkAuth();
-    
-    // Set up language toggle
-    const languageToggle = document.querySelector('.language-toggle');
-    if (languageToggle && window.LanguageSystem) {
-      languageToggle.addEventListener('click', function() {
-        const currentLang = LanguageSystem.getLanguage();
-        const newLang = currentLang === 'en' ? 'es' : 'en';
-        LanguageSystem.setLanguage(newLang);
-      });
-    }
-    
-    // Set initial language
-    DOM.languageSelect.value = STATE.currentLanguage;
-    
-    // Set up event listeners
-    setupEventListeners();
-    
-    // Update UI with translations
-    updateLanguage();
-    
-    // Check if survey was already submitted
-    const lastSubmission = localStorage.getItem('lastSurveySubmission');
-    if (lastSubmission) {
-      const lastDate = new Date(lastSubmission);
-      const now = new Date();
-      // If last submission was within 24 hours, show message
-      if (now - lastDate < 24 * 60 * 60 * 1000) {
-        showError('You have already submitted a survey in the last 24 hours. Please try again tomorrow.');
-        return;
+  async function init() {
+    try {
+      console.log('Initializing application...');
+      
+      // Generate device fingerprint for duplicate prevention
+      STATE.deviceFingerprint = await generateDeviceFingerprint();
+      console.log('Device fingerprint generated:', STATE.deviceFingerprint);
+      
+      // Check for duplicate submission if prevention is enabled
+      if (isDuplicatePreventionEnabled()) {
+        console.log('Duplicate prevention is enabled, checking...');
+        const isDuplicate = await checkForDuplicateSubmission(STATE.deviceFingerprint);
+        if (isDuplicate) {
+          console.log('Duplicate submission detected');
+          showDuplicateSubmissionMessage();
+          return;
+        }
+        console.log('No duplicate detected');
+      } else {
+        console.log('Duplicate prevention is disabled - resetting state');
+        resetSurveyState();
       }
+      
+      // Load questions from the server
+      console.log('Loading questions...');
+      await loadQuestions();
+      console.log('Questions loaded:', STATE.questions.length);
+      
+      // Set up event listeners
+      console.log('Setting up event listeners...');
+      setupEventListeners();
+      
+      // Update language first
+      console.log('Updating language...');
+      updateLanguage();
+      
+      // Initialize weather display
+      console.log('Initializing weather...');
+      getWeatherData();
+      
+      // Render the first question
+      console.log('Rendering first question...');
+      renderCurrentQuestion();
+      
+      // Render navigation and progress indicator
+      console.log('Rendering navigation and progress...');
+      renderNavigation();
+      renderProgressIndicator();
+      
+      console.log('Application initialized successfully');
+      
+    } catch (error) {
+      console.error('Error initializing app:', error);
+      showError(translations[STATE.currentLanguage].failedToLoad || 'Failed to load questions. Please try again.');
     }
-
-    // Load questions
-    loadQuestions();
-    
-    // Get weather data
-    getWeatherData();
-    
-    // Generate device fingerprint
-    STATE.deviceFingerprint = generateDeviceFingerprint();
-    
-    // Check for duplicate submission
-    checkDuplicateSubmission();
   }
-  
+
   /**
-   * Set up all event listeners
+   * Load questions from the server
+   */
+  async function loadQuestions() {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/questions`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch questions');
+      }
+      
+      const result = await response.json();
+      // Extract questions from the data property
+      STATE.questions = result.data || result;
+      
+      console.log('📋 Questions loaded successfully:');
+      console.log('  - Total questions:', STATE.questions.length);
+      console.log('  - Questions:', STATE.questions);
+      
+    } catch (error) {
+      console.error('Error loading questions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set up event listeners
    */
   function setupEventListeners() {
-    // Language toggle
-    DOM.languageSelect.addEventListener('change', (e) => {
-      STATE.currentLanguage = e.target.value;
-      localStorage.setItem('language', STATE.currentLanguage);
-      
-      // Update language in our simple language system
-      if (window.SimpleLanguage) {
-        SimpleLanguage.setLanguage(STATE.currentLanguage);
-        
-        // Update all UI elements with new translations
-        setTimeout(() => {
-          SimpleLanguage.updateUI();
-          console.log(`Language changed to ${STATE.currentLanguage} via select dropdown`);
-        }, 10);
-      }
-      
-      // Re-render the current question to update translations
-      renderCurrentQuestion();
-      renderNavigation();
-    });
-    
-    // Form submission
-    DOM.form.addEventListener('submit', handleFormSubmit);
-    
-    // Weather display click for temperature unit toggle
-    if (DOM.weatherDisplay) {
-      DOM.weatherDisplay.addEventListener('click', () => {
-        // Toggle between Celsius and Fahrenheit
-        STATE.temperatureUnit = STATE.temperatureUnit === 'C' ? 'F' : 'C';
-        // Save preference
-        localStorage.setItem('temperatureUnit', STATE.temperatureUnit);
-        // Update display
-        updateWeatherDisplay();
+    // Language selector
+    if (DOM.languageSelect) {
+      DOM.languageSelect.addEventListener('change', (e) => {
+        STATE.currentLanguage = e.target.value;
+        localStorage.setItem('language', STATE.currentLanguage);
+        updateLanguage();
+        renderCurrentQuestion();
       });
     }
-    
-    // Navigation button events will be set up in renderNavigation()
+
+    // Form submission
+    if (DOM.form) {
+      DOM.form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleSubmitFromNavigation();
+      });
+    }
   }
-  
+
   /**
    * Update all text elements with translations
    */
   function updateLanguage() {
-    // Use our new i18n system if available
-    if (window.i18n) {
-      // Set the language in our i18n system
-      i18n.setLanguage(STATE.currentLanguage);
-      
-      // Update all translatable elements
-      i18n.updatePageTranslations();
-      
-      // Update document title
-      document.title = i18n.translate('appTitle');
-    } else {
-      // Fallback to the old translation system
-      // Update title
-      document.title = translations[STATE.currentLanguage].appTitle;
-      
-      // Update heading
-      document.querySelector('h1').textContent = translations[STATE.currentLanguage].surveyTitle;
-      
-      // Update language toggle
-      document.querySelector('.language-toggle label').textContent = 
-        STATE.currentLanguage === 'en' ? 'Language:' : 'Idioma:';
-      
-      // Update status message
-      const statusP = document.querySelector('.status-message p');
-      if (statusP) {
-        statusP.innerHTML = `<strong>${STATE.currentLanguage === 'en' ? 'Status' : 'Estado'}:</strong> ${translations[STATE.currentLanguage].statusMessage || 'Frontend successfully loaded!'}`;
+    console.log('🔍 updateLanguage called');
+    
+    // Safety check - make sure STATE is initialized
+    if (typeof STATE === 'undefined') {
+      console.log('🔍 STATE not yet initialized, skipping updateLanguage');
+      return;
+    }
+    
+    console.log('🔍 STATE.currentLanguage:', STATE.currentLanguage);
+    
+    const currentTranslations = translations[STATE.currentLanguage];
+    console.log('🔍 currentTranslations:', currentTranslations);
+    
+    // Update all elements with data-i18n attributes
+    const i18nElements = document.querySelectorAll('[data-i18n]');
+    console.log('🔍 Found i18n elements:', i18nElements.length);
+    
+    i18nElements.forEach(element => {
+      const key = element.getAttribute('data-i18n');
+      console.log('🔍 Updating element with key:', key, 'value:', currentTranslations[key]);
+      if (currentTranslations[key]) {
+        element.textContent = currentTranslations[key];
+        console.log('🔍 Updated element text to:', element.textContent);
       }
-      
-      // Update admin panel link
-      const adminLink = document.querySelector('a[href="/admin.html"]');
-      if (adminLink) {
-        adminLink.textContent = translations[STATE.currentLanguage].adminPanel;
-      }
+    });
+    
+    // Update language selector
+    if (DOM.languageSelect) {
+      DOM.languageSelect.value = STATE.currentLanguage;
+      console.log('🔍 Updated language selector to:', STATE.currentLanguage);
     }
     
-    // Update form elements
-    const userIdLabel = document.querySelector('label[for="userId"]');
-    if (userIdLabel) {
-      userIdLabel.textContent = translations[STATE.currentLanguage].userId + ':';
-    }
-    
-    // Update submit button
-    DOM.submitButton.textContent = translations[STATE.currentLanguage].submit;
-    
-    // Update weather display if data is available
-    if (STATE.weatherData) {
-      updateWeatherDisplay();
-    }
+    console.log('🔍 Language updated to:', STATE.currentLanguage);
   }
-  
-  /**
-   * Load active questions from the API
-   */
-  async function loadQuestions() {
-    try {
-      console.log('Loading questions...');
-      showLoading(DOM.questionsDiv);
-      
-      const url = window.location.origin + '/api/questions';
-      console.log('Fetching questions from:', url);
-      console.log('Current window.location:', window.location);
-      console.log('Current window.location.origin:', window.location.origin);
-      
-      const response = await fetch(url, {
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to load questions');
-      }
-      
-      const result = await response.json();
-      console.log('API response:', result);
-      
-      // Handle both response formats (array or {success, data})
-      const questions = Array.isArray(result) ? result : (result.data || []);
-      console.log('Parsed questions:', questions);
-      
-      if (questions.length === 0) {
-        DOM.questionsDiv.innerHTML = `
-          <div class="no-questions">
-            ${translations[STATE.currentLanguage].noQuestionsMessage || 'No questions found.'}
-          </div>
-        `;
-        DOM.submitButton.style.display = 'none';
-        DOM.progressIndicator.style.display = 'none';
-        DOM.navigationButtons.style.display = 'none';
-        return;
-      }
-      
-      // Sort questions by order if available
-      STATE.questions = questions.sort((a, b) => (a.order || 9999) - (b.order || 9999));
-      STATE.currentQuestionIndex = -1; // Start at employee ID input
-      STATE.responses = new Map();
-      STATE.employeeId = ''; // Reset employee ID
-      
-      renderCurrentQuestion();
-      renderProgressIndicator();
-      renderNavigation();
-      
-      // Apply translations after questions are loaded
-      if (window.SimpleLanguage) {
-        setTimeout(() => {
-          SimpleLanguage.updateUI();
-          console.log('Applied translations after questions loaded');
-        }, 50);
-      }
-      
-      // Hide the submit button since we'll use the next button as submit on the last question
-      DOM.submitButton.style.display = 'none';
-    } catch (error) {
-      console.error('Error loading questions:', error);
-      DOM.questionsDiv.innerHTML = `
-        <div class="error">
-          ${translations[STATE.currentLanguage].failedToLoad || 'Failed to load questions. Please try again.'}
-        </div>
-      `;
-    }
-  }
-  
+
   /**
    * Synchronize the language of all form elements
    * This ensures that all elements use the same language
@@ -349,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update navigation buttons
     const prevButton = document.querySelector('.prev-button');
     if (prevButton) {
-      prevButton.textContent = i18n.translate('prevButton');
+      prevButton.textContent = i18n.translate('previous');
     }
     
     const nextButton = document.querySelector('.next-button');
@@ -383,56 +349,34 @@ document.addEventListener('DOMContentLoaded', () => {
    * Render the current question based on the currentQuestionIndex
    */
   function renderCurrentQuestion() {
+    console.log('🔍 renderCurrentQuestion called');
+    console.log('🔍 STATE.questions:', STATE.questions);
+    console.log('🔍 STATE.currentQuestionIndex:', STATE.currentQuestionIndex);
+    
     // If we're showing the confirmation page, render that instead
     if (STATE.showConfirmation) {
+      console.log('🔍 Showing confirmation page');
       renderConfirmationPage();
       return;
     }
     
     DOM.questionsDiv.innerHTML = ''; // Clear existing questions
     
-    // Handle employee ID input screen
-    if (STATE.currentQuestionIndex === -1) {
-      // Show the employee ID form group and hide questions
-      const formGroup = DOM.employeeIdInput.closest('.form-group');
-      if (formGroup) {
-        formGroup.style.display = 'block';
-      }
-      
-      // Update label and help text
-      const label = formGroup.querySelector('label');
-      if (label) {
-        label.textContent = translations[STATE.currentLanguage].employeeIdPrompt || 'Please enter your Employee ID';
-      }
-      
-      // Add help text if it doesn't exist
-      let helpText = formGroup.querySelector('.help-text');
-      if (!helpText) {
-        helpText = document.createElement('p');
-        helpText.className = 'help-text';
-        formGroup.appendChild(helpText);
-      }
-      helpText.textContent = translations[STATE.currentLanguage].employeeIdHelp || 'This helps us prevent duplicate submissions';
-      
-      // Update input value and add event listener
-      DOM.employeeIdInput.value = STATE.employeeId;
-      DOM.employeeIdInput.addEventListener('input', (e) => {
-        STATE.employeeId = e.target.value;
-      });
-      
+    // Check if we have questions to display
+    if (STATE.questions.length === 0) {
+      console.log('🔍 No questions available');
+      DOM.questionsDiv.innerHTML = '<p>No questions available. Please check the console for errors.</p>';
       return;
-    } else {
-      // Hide the employee ID form group when showing questions
-      const formGroup = DOM.employeeIdInput.closest('.form-group');
-      if (formGroup) {
-        formGroup.style.display = 'none';
-      }
     }
     
-    if (STATE.questions.length === 0) return;
-    
     const question = STATE.questions[STATE.currentQuestionIndex];
-    if (!question) return;
+    if (!question) {
+      console.log('🔍 No question at current index');
+      DOM.questionsDiv.innerHTML = '<p>Question not found at current index.</p>';
+      return;
+    }
+    
+    console.log('🔍 Rendering question:', question);
     
     const questionDiv = document.createElement('div');
     questionDiv.className = 'question';
@@ -532,53 +476,90 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(synchronizeFormLanguage, 50);
     }
   }
-  
+
   /**
    * Render the confirmation page after survey submission
    */
   function renderConfirmationPage() {
-    // Hide progress indicator and navigation buttons when showing confirmation
+    // Hide progress indicator, navigation buttons, and submit button when showing confirmation
     DOM.progressIndicator.style.display = 'none';
     DOM.navigationButtons.style.display = 'none';
-    
+    DOM.submitButton.style.display = 'none';
+
     // Create confirmation message
     const confirmationDiv = document.createElement('div');
     confirmationDiv.className = 'confirmation-page';
-    
+
     const icon = document.createElement('div');
     icon.className = 'confirmation-icon';
     icon.innerHTML = '✓';
     confirmationDiv.appendChild(icon);
-    
+
     const message = document.createElement('h2');
-    message.className = 'confirmation-message';
     message.textContent = translations[STATE.currentLanguage].confirmationMessage || 'Thank you for completing the survey';
     confirmationDiv.appendChild(message);
-    
-    const newSurveyBtn = document.createElement('button');
-    newSurveyBtn.className = 'new-survey-button';
-    newSurveyBtn.textContent = translations[STATE.currentLanguage].startNewSurvey || 'Start a new survey';
-    newSurveyBtn.addEventListener('click', () => {
-      // Reset the form and state
-      DOM.form.reset();
-      STATE.responses = new Map();
-      STATE.currentQuestionIndex = 0;
-      STATE.showConfirmation = false;
-      
-      // Show progress indicator and navigation buttons again
-      DOM.progressIndicator.style.display = 'block';
-      DOM.navigationButtons.style.display = 'block';
-      
-      // Reload questions
-      loadQuestions();
-    });
-    confirmationDiv.appendChild(newSurveyBtn);
-    
+
+    // Only show "Start a new survey" button if duplicate prevention is DISABLED
+    if (!isDuplicatePreventionEnabled()) {
+      const newSurveyBtn = document.createElement('button');
+      newSurveyBtn.className = 'new-survey-button';
+      newSurveyBtn.textContent = translations[STATE.currentLanguage].startNewSurvey || 'Start a new survey';
+      newSurveyBtn.addEventListener('click', () => {
+        // Use the proper reset function
+        resetSurveyState();
+      });
+      confirmationDiv.appendChild(newSurveyBtn);
+    } else {
+      // If duplicate prevention is enabled, show a block message
+      const blockMsg = document.createElement('p');
+      blockMsg.className = 'duplicate-block-msg';
+      blockMsg.textContent = translations[STATE.currentLanguage].duplicateSubmissionMessage || 'You have already completed this survey. Thank you for your participation!';
+      confirmationDiv.appendChild(blockMsg);
+    }
+
     // Clear questions div and add confirmation
     DOM.questionsDiv.innerHTML = '';
     DOM.questionsDiv.appendChild(confirmationDiv);
   }
-  
+
+  /**
+   * Reset survey state to start a new survey
+   */
+  function resetSurveyState() {
+    console.log('🔄 resetSurveyState called - starting survey restart');
+    console.log('🔄 Before reset - currentQuestionIndex:', STATE.currentQuestionIndex);
+    console.log('🔄 Before reset - responses:', STATE.responses);
+    console.log('🔍 Before reset - showConfirmation:', STATE.showConfirmation);
+    
+    // Reset all state variables
+    STATE.responses = new Map();
+    STATE.currentQuestionIndex = 0;
+    STATE.showConfirmation = false;
+    
+    // Reset the form
+    DOM.form.reset();
+    
+    // Clear the questions div
+    DOM.questionsDiv.innerHTML = '';
+    
+    // Show progress indicator and navigation buttons
+    DOM.progressIndicator.style.display = 'block';
+    DOM.navigationButtons.style.display = 'block';
+    DOM.submitButton.style.display = 'none'; // Keep hidden, we use navigation buttons
+    
+    console.log('🔄 After reset - currentQuestionIndex:', STATE.currentQuestionIndex);
+    console.log('🔄 After reset - responses:', STATE.responses);
+    console.log('🔍 After reset - showConfirmation:', STATE.showConfirmation);
+    
+    // Re-render everything
+    console.log('🔄 Re-rendering question, navigation, and progress...');
+    renderCurrentQuestion();
+    renderNavigation();
+    renderProgressIndicator();
+    
+    console.log('🔄 Survey restart completed successfully');
+  }
+
   /**
    * Render the subway-style progress indicator
    */
@@ -627,85 +608,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     DOM.progressIndicator.appendChild(progressContainer);
   }
-  
-  /**
-   * Render navigation buttons (previous/next)
-   */
-  function renderNavigation() {
-    DOM.navigationButtons.innerHTML = '';
-    
-    if (STATE.questions.length === 0 || STATE.showConfirmation) return;
-    
-    const navContainer = document.createElement('div');
-    navContainer.className = 'navigation-container';
-    
-    // Previous button
-    const prevButton = document.createElement('button');
-    prevButton.type = 'button';
-    prevButton.className = 'nav-button prev-button';
-    prevButton.textContent = 'Previous';
-    
-    // Disable previous button if we're on the first question or employee ID screen
-    if (STATE.currentQuestionIndex <= 0) {
-      prevButton.disabled = true;
-    }
-    
-    prevButton.addEventListener('click', goToPreviousQuestion);
-    navContainer.appendChild(prevButton);
-    
-    // Next button
-    const nextButton = document.createElement('button');
-    nextButton.type = 'button';
-    
-    // If we're on the last question, make it a submit button
-    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
-      nextButton.className = 'nav-button submit-button';
-      nextButton.textContent = 'Submit';
-      nextButton.addEventListener('click', handleSubmitFromNavigation);
-    } else {
-      nextButton.className = 'nav-button next-button';
-      nextButton.textContent = 'Next';
-      nextButton.addEventListener('click', goToNextQuestion);
-    }
-    
-    navContainer.appendChild(nextButton);
-    DOM.navigationButtons.appendChild(navContainer);
-  }
-  
-  /**
-   * Go to the previous question
-   */
-  function goToPreviousQuestion() {
-    // If we're on the employee ID input screen, do nothing
-    if (STATE.currentQuestionIndex === -1) return;
-    
-    // Validate current question before proceeding
-    const question = STATE.questions[STATE.currentQuestionIndex];
-    if (!validateCurrentQuestion(question)) {
-      return;
-    }
-    
-    STATE.currentQuestionIndex--;
-    renderCurrentQuestion();
-    renderProgressIndicator();
-    renderNavigation();
-    
-    // Apply translations after navigation
-    if (window.SimpleLanguage) {
-      setTimeout(() => {
-        SimpleLanguage.updateUI();
-        console.log('Applied translations after previous navigation');
-      }, 50);
-    }
-  }
-  
+
   /**
    * Validate that the current question has a valid response
    * @param {Object} question - The current question object
    * @returns {boolean} Whether the question has a valid response
    */
   function validateCurrentQuestion(question) {
-    if (!question) return false;
+    // Guard: Only validate if question is present
+    if (!question) return true;
     
     // Check if we have a response for this question
     if (!STATE.responses.has(question._id)) {
@@ -725,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     return true;
   }
-  
+
   /**
    * Fetch weather data for the user's location
    */
@@ -832,31 +743,6 @@ document.addEventListener('DOMContentLoaded', () => {
    * Handle form submission triggered from the navigation button
    */
   async function handleSubmitFromNavigation() {
-    // Check if we're on the employee ID input screen
-    if (STATE.currentQuestionIndex === -1) {
-      if (!DOM.employeeIdInput || !DOM.employeeIdInput.value.trim()) {
-        showError(translations[STATE.currentLanguage].employeeIdRequired || 'Please enter your Employee ID');
-        return;
-      }
-      STATE.employeeId = DOM.employeeIdInput.value.trim();
-
-      // Check if this employee has submitted today
-      const lastSubmission = localStorage.getItem(`lastSubmission_${STATE.employeeId}`);
-      if (lastSubmission) {
-        const lastDate = new Date(lastSubmission);
-        const now = new Date();
-        // If last submission was within 24 hours, show message
-        if (now - lastDate < 24 * 60 * 60 * 1000) {
-          showError(translations[STATE.currentLanguage].alreadySubmitted || 'You have already submitted a survey in the last 24 hours. Please try again tomorrow.');
-          return;
-        }
-      }
-
-      STATE.currentQuestionIndex = 0;
-      renderCurrentQuestion();
-      return;
-    }
-
     // Validate the current question
     const currentQuestion = STATE.questions[STATE.currentQuestionIndex];
     if (!validateCurrentQuestion(currentQuestion)) {
@@ -865,12 +751,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Now handle the actual submission
     try {
-      // Validate employeeId
-      if (!STATE.employeeId) {
-        showError(translations[STATE.currentLanguage].employeeIdRequired || 'Employee ID is required');
-        return;
-      }
-      
       // Validate all questions have responses
       const unansweredQuestions = STATE.questions.filter(q => !STATE.responses.has(q._id));
       if (unansweredQuestions.length > 0) {
@@ -890,13 +770,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Create an array of promises for submitting each response
       const promises = [];
       
-      STATE.questions.forEach((question, index) => {
-        const response = STATE.responses.get(index);
+      STATE.questions.forEach((question) => {
+        const response = STATE.responses.get(question._id);
         if (!response) return;
         
         const payload = {
           questionId: question._id,
-          userId: STATE.employeeId, // Ensure employee ID is included
           deviceFingerprint: STATE.deviceFingerprint, // Add device fingerprint
           submissionTimestamp: new Date().toISOString()
         };
@@ -936,11 +815,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Save submission timestamp
       localStorage.setItem('lastSurveySubmission', new Date().toISOString());
-      localStorage.setItem(`lastSubmission_${STATE.employeeId}`, new Date().toISOString());
       
       // Show the confirmation page
       STATE.showConfirmation = true;
-      renderCurrentQuestion();
+      renderConfirmationPage();
       
       showSuccess(translations[STATE.currentLanguage].submissionSuccess || 'Responses submitted successfully');
       
@@ -1028,35 +906,26 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param {string} message - Error message to display
    */
   function showError(message) {
-    // Check if a message container already exists
-    let messageContainer = document.querySelector('.message-container');
+    console.error('Error:', message);
     
-    if (!messageContainer) {
-      // Create a new message container
-      messageContainer = document.createElement('div');
-      messageContainer.className = 'message-container';
-      document.body.appendChild(messageContainer);
+    // Create or update status message element
+    let statusDiv = document.getElementById('status-message');
+    if (!statusDiv) {
+      statusDiv = document.createElement('div');
+      statusDiv.id = 'status-message';
+      statusDiv.className = 'status-message error';
+      document.querySelector('.container').insertBefore(statusDiv, document.querySelector('main'));
     }
     
-    // Create error message element
-    const errorMessage = document.createElement('div');
-    errorMessage.className = 'message error';
-    errorMessage.textContent = message;
+    statusDiv.className = 'status-message error';
+    statusDiv.textContent = message;
+    statusDiv.style.display = 'block';
     
-    // Add close button
-    const closeButton = document.createElement('button');
-    closeButton.className = 'close-message';
-    closeButton.textContent = '×';
-    closeButton.addEventListener('click', () => {
-      errorMessage.remove();
-    });
-    
-    errorMessage.appendChild(closeButton);
-    messageContainer.appendChild(errorMessage);
-    
-    // Auto-remove after 5 seconds
+    // Auto-hide after 5 seconds
     setTimeout(() => {
-      errorMessage.remove();
+      if (statusDiv) {
+        statusDiv.style.display = 'none';
+      }
     }, 5000);
   }
 
@@ -1064,37 +933,28 @@ document.addEventListener('DOMContentLoaded', () => {
    * Go to the next question
    */
   function goToNextQuestion() {
+    // Validate current question before proceeding
+    const question = STATE.questions[STATE.currentQuestionIndex];
+    if (!validateCurrentQuestion(question)) {
+      return;
+    }
+    
     // If we're on the last question, handle submission
     if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
       handleSubmitFromNavigation();
       return;
     }
     
-    // Handle employee ID validation
-    if (STATE.currentQuestionIndex === -1) {
-      const employeeId = STATE.employeeId.trim();
-      if (!employeeId) {
-        showError(translations[STATE.currentLanguage].employeeIdRequired || 'Employee ID is required');
-        return;
-      }
-      
-      // Check if it's a reasonable length (e.g., between 3 and 20 characters)
-      if (employeeId.length < 3 || employeeId.length > 20) {
-        showError(translations[STATE.currentLanguage].employeeIdInvalid || 'Employee ID must be between 3 and 20 characters');
-        return;
-      }
-    } else if (STATE.currentQuestionIndex >= 0) {
-      // Validate current question before proceeding
-      const question = STATE.questions[STATE.currentQuestionIndex];
-      if (!validateCurrentQuestion(question)) {
-        return;
-      }
-    }
-    
     STATE.currentQuestionIndex++;
     renderCurrentQuestion();
-    renderProgressIndicator();
     renderNavigation();
+    renderProgressIndicator();
+    
+    // Force navigation re-render to ensure button updates
+    setTimeout(() => {
+      console.log('🔄 Force re-rendering navigation after timeout');
+      renderNavigation();
+    }, 10);
     
     // Apply translations after navigation
     if (window.SimpleLanguage) {
@@ -1106,90 +966,92 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
-   * Generate a unique device fingerprint for duplicate prevention
-   * @returns {string} Base64 encoded device fingerprint
+   * Generate a device fingerprint for duplicate detection
    */
-  function generateDeviceFingerprint() {
+  async function generateDeviceFingerprint() {
     try {
-      // Create canvas fingerprint
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       ctx.textBaseline = 'top';
       ctx.font = '14px Arial';
-      ctx.fillText('Survey fingerprint', 2, 2);
+      ctx.fillText('Device fingerprint', 2, 2);
       
-      // Collect device characteristics
       const fingerprint = {
-        screen: `${screen.width}x${screen.height}x${screen.colorDepth}`,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        language: navigator.language,
-        languages: navigator.languages ? navigator.languages.join(',') : '',
-        platform: navigator.platform,
-        cookieEnabled: navigator.cookieEnabled,
-        doNotTrack: navigator.doNotTrack,
         canvas: canvas.toDataURL(),
-        userAgent: navigator.userAgent.slice(0, 100), // Truncated for privacy
-        hardwareConcurrency: navigator.hardwareConcurrency || 0,
-        maxTouchPoints: navigator.maxTouchPoints || 0,
-        timestamp: Date.now()
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        platform: navigator.platform,
+        screen: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        cookieEnabled: navigator.cookieEnabled,
+        doNotTrack: navigator.doNotTrack
       };
       
-      // Convert to base64 string
-      return btoa(JSON.stringify(fingerprint)).slice(0, 64); // Limit length
-    } catch (error) {
-      console.error('Error generating fingerprint:', error);
-      // Fallback fingerprint
-      return btoa(`${Date.now()}-${Math.random()}`).slice(0, 32);
-    }
-  }
-
-  /**
-   * Check if survey has already been completed on this device
-   * @returns {boolean} True if survey was already completed
-   */
-  function checkLocalCompletion() {
-    const completed = localStorage.getItem('survey_completed');
-    const completedDate = localStorage.getItem('survey_completed_date');
-    
-    if (completed && completedDate) {
-      const daysSinceCompletion = (Date.now() - parseInt(completedDate)) / (1000 * 60 * 60 * 24);
-      // Allow retaking after 30 days (configurable)
-      if (daysSinceCompletion < 30) {
-        return true;
-      } else {
-        // Clear old completion data
-        localStorage.removeItem('survey_completed');
-        localStorage.removeItem('survey_completed_date');
+      // Create a hash of the fingerprint
+      const fingerprintString = JSON.stringify(fingerprint);
+      let hash = 0;
+      for (let i = 0; i <fingerprintString.length; i++) {
+        const char = fingerprintString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
       }
+      
+      return Math.abs(hash).toString(36);
+    } catch (error) {
+      console.error('Error generating device fingerprint:', error);
+      // Fallback to a simple random string
+      return Math.random().toString(36).substring(2, 15);
     }
-    return false;
   }
 
   /**
-   * Check with server if this device/IP has already submitted a survey
-   * @param {string} fingerprint - Device fingerprint
-   * @returns {Promise<boolean>} True if already submitted
+   * Check if duplicate prevention is enabled
    */
-  async function checkServerCompletion(fingerprint) {
+  function isDuplicatePreventionEnabled() {
+    const enabled = localStorage.getItem('duplicatePreventionEnabled');
+    return enabled === 'true';
+  }
+
+  /**
+   * Check for duplicate submission using device fingerprint
+   * @param {string} fingerprint - Device fingerprint
+   * @returns {boolean} Whether this is a duplicate submission
+   */
+  async function checkForDuplicateSubmission(fingerprint) {
     try {
-      const response = await fetch('/api/check-submission', {
+      // If duplicate prevention is disabled, always allow submission
+      if (!isDuplicatePreventionEnabled()) {
+        console.log('Duplicate prevention disabled - allowing submission');
+        return false;
+      }
+
+      // Check local storage first
+      const localCompleted = localStorage.getItem('survey_completed');
+      if (localCompleted === 'true') {
+        console.log('Local duplicate detected');
+        return true;
+      }
+
+      // Check server-side duplicate
+      const response = await fetch(`${API_CONFIG.BASE_URL}/check-submission`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders()
-        },
-        body: JSON.stringify({ fingerprint })
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ deviceFingerprint: fingerprint })
       });
-      
+
       if (response.ok) {
         const result = await response.json();
-        return result.alreadySubmitted;
+        if (result.isDuplicate) {
+          console.log('Server-side duplicate detected');
+          return true;
+        }
       }
-      
+
       return false;
     } catch (error) {
-      console.error('Error checking server completion:', error);
-      return false; // Allow survey if check fails
+      console.error('Error checking for duplicate submission:', error);
+      // Don't block the user if there's an error checking duplicates
+      return false;
     }
   }
 
@@ -1200,57 +1062,302 @@ document.addEventListener('DOMContentLoaded', () => {
   function markSurveyCompleted(fingerprint) {
     // Mark locally
     localStorage.setItem('survey_completed', 'true');
-    localStorage.setItem('survey_completed_date', Date.now().toString());
+    localStorage.setItem('survey_completion_date', new Date().toISOString());
     
     // Update state
     STATE.surveyCompleted = true;
   }
 
   /**
+   * Test function for debugging duplicate prevention (accessible from console)
+   * Call this from browser console: window.testDuplicatePrevention()
+   */
+  window.testDuplicatePrevention = function() {
+    console.log('Testing duplicate prevention...');
+    console.log('Current language:', STATE.currentLanguage);
+    console.log('Translations available:', Object.keys(translations));
+    console.log('Current translations:', translations[STATE.currentLanguage]);
+    
+    // Set local completion flag to simulate duplicate
+    localStorage.setItem('survey_completed', 'true');
+    localStorage.setItem('survey_completion_date', new Date().toISOString());
+    
+    // Show the duplicate message
+    showDuplicateSubmissionMessage();
+    console.log('Duplicate message should now be displayed');
+  };
+
+  /**
+   * Function to clear duplicate flags and refresh (accessible from console)
+   * Call this from browser console: window.clearDuplicateFlags()
+   */
+  window.clearDuplicateFlags = function() {
+    console.log('Clearing duplicate flags...');
+    localStorage.removeItem('survey_completed');
+    localStorage.removeItem('survey_completion_time');
+    console.log('Duplicate flags cleared. Refreshing page...');
+    location.reload();
+  };
+
+  /**
+   * Function to check duplicate prevention status (accessible from console)
+   * Call this from browser console: window.checkDuplicateStatus()
+   */
+  window.checkDuplicateStatus = function() {
+    const enabled = isDuplicatePreventionEnabled();
+    const completed = localStorage.getItem('survey_completed');
+    const completionDate = localStorage.getItem('survey_completion_date');
+    
+    console.log('Duplicate Prevention Status:');
+    console.log('- Enabled:', enabled);
+    console.log('- Survey Completed Flag:', completed);
+    console.log('- Completion Date:', completionDate);
+    console.log('- Duration Setting:', localStorage.getItem('duplicatePreventionDuration') || '30', 'days');
+    
+    if (completed && completionDate) {
+      const completedAt = new Date(completionDate);
+      const now = new Date();
+      const daysDiff = (now - completedAt) / (1000 * 60 * 60 * 24);
+      console.log('- Days since completion:', daysDiff.toFixed(1));
+    }
+  };
+
+  /**
+   * Clear old duplicate flags from the removed 24-hour system (accessible from console)
+   * Call this from browser console: window.clearOldDuplicateFlags()
+   */
+  window.clearOldDuplicateFlags = function() {
+    console.log('Clearing old duplicate flags...');
+    
+    // Clear all employee-specific submission flags from the old system
+    const keys = Object.keys(localStorage);
+    let cleared = 0;
+    keys.forEach(key => {
+      if (key.startsWith('lastSubmission_')) {
+        localStorage.removeItem(key);
+        console.log('Removed:', key);
+        cleared++;
+      }
+    });
+    
+    console.log(`Cleared ${cleared} old duplicate flags. Refreshing page...`);
+    window.location.reload();
+  };
+
+  /**
    * Show duplicate submission message
    */
   function showDuplicateSubmissionMessage() {
-    const container = document.querySelector('.container');
-    container.innerHTML = `
-      <div class="duplicate-submission-message">
-        <div class="icon">⚠️</div>
-        <h2 data-i18n="duplicateTitle">Survey Already Completed</h2>
-        <p data-i18n="duplicateMessage">
-          Thank you for your interest! This survey has already been completed from this device. 
-          Each employee can only submit one response to ensure data accuracy.
-        </p>
-        <p data-i18n="duplicateContact">
-          If you believe this is an error, please contact your administrator.
-        </p>
-        <div class="duplicate-actions">
-          <button onclick="window.location.href='/admin.html'" class="admin-link" data-i18n="adminPanel">
-            Admin Panel
-          </button>
-        </div>
+    console.log('Showing duplicate submission message');
+    
+    // Check if duplicate prevention is enabled
+    const preventionEnabled = isDuplicatePreventionEnabled();
+    
+    // Create the duplicate actions section only if prevention is disabled
+    const duplicateActionsHtml = preventionEnabled ? '' : `
+      <div class="duplicate-actions">
+        <button type="button" onclick="clearDuplicateFlags()" class="btn-secondary">
+          <span data-i18n="allowNewSubmission">Allow New Submission</span>
+        </button>
       </div>
     `;
     
-    // Apply translations
-    updateTranslations();
+    // Clear the questions div and show duplicate message
+    DOM.questionsDiv.innerHTML = `
+      <div class="duplicate-submission-message">
+        <h2 data-i18n="duplicateSubmissionTitle">Survey Already Completed</h2>
+        <p data-i18n="duplicateSubmissionMessage">You have already completed this survey. Thank you for your participation!</p>
+        ${duplicateActionsHtml}
+      </div>
+    `;
+    
+    // Hide navigation buttons
+    DOM.navigationButtons.innerHTML = '';
+    
+    // Update translations for the duplicate message
+    updateLanguage();
   }
 
   /**
-   * Check for duplicate submission
+   * Clear duplicate flags and allow new submission (for testing/admin purposes)
    */
-  async function checkDuplicateSubmission() {
-    // Check local completion
-    if (checkLocalCompletion()) {
-      showDuplicateSubmissionMessage();
-      return;
+  function clearDuplicateFlags() {
+    localStorage.removeItem('survey_completed');
+    localStorage.removeItem('survey_completion_time');
+    console.log('Duplicate flags cleared, reloading page...');
+    window.location.reload();
+  }
+
+  /**
+   * Reset survey state for a new submission
+   */
+  function resetSurveyState() {
+    console.log('🔄 resetSurveyState called - starting survey restart');
+    console.log('🔄 Before reset - currentQuestionIndex:', STATE.currentQuestionIndex);
+    console.log('🔄 Before reset - responses:', STATE.responses);
+    console.log('🔍 Before reset - showConfirmation:', STATE.showConfirmation);
+    
+    // Reset all state variables
+    STATE.responses = new Map();
+    STATE.currentQuestionIndex = 0;
+    STATE.showConfirmation = false;
+    
+    // Reset the form
+    DOM.form.reset();
+    
+    // Clear the questions div
+    DOM.questionsDiv.innerHTML = '';
+    
+    // Show progress indicator and navigation buttons
+    DOM.progressIndicator.style.display = 'block';
+    DOM.navigationButtons.style.display = 'block';
+    DOM.submitButton.style.display = 'none'; // Keep hidden, we use navigation buttons
+    
+    console.log('🔄 After reset - currentQuestionIndex:', STATE.currentQuestionIndex);
+    console.log('🔄 After reset - responses:', STATE.responses);
+    console.log('🔍 After reset - showConfirmation:', STATE.showConfirmation);
+    
+    // Re-render everything
+    console.log('🔄 Re-rendering question, navigation, and progress...');
+    renderCurrentQuestion();
+    renderNavigation();
+    renderProgressIndicator();
+    
+    console.log('🔄 Survey restart completed successfully');
+  }
+
+  /**
+   * Render navigation buttons (Previous/Next/Submit)
+   */
+  function renderNavigation() {
+    DOM.navigationButtons.innerHTML = '';
+    
+    if (STATE.questions.length === 0) return;
+    
+    // Debug logging
+    console.log('🔍 renderNavigation Debug:');
+    console.log('  - Current question index:', STATE.currentQuestionIndex);
+    console.log('  - Total questions:', STATE.questions.length);
+    console.log('  - Is last question?', STATE.currentQuestionIndex === STATE.questions.length - 1);
+    
+    const navContainer = document.createElement('div');
+    navContainer.className = 'navigation-container';
+    
+    // Previous button (only show if not on first question)
+    if (STATE.currentQuestionIndex > 0) {
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'nav-button prev-button';
+      prevBtn.textContent = translations[STATE.currentLanguage].previous || 'Previous';
+      prevBtn.setAttribute('data-button-type', 'previous');
+      prevBtn.setAttribute('data-force-text', 'previous');
+      prevBtn.addEventListener('click', () => {
+        STATE.currentQuestionIndex--;
+        renderCurrentQuestion();
+        renderNavigation();
+        renderProgressIndicator();
+      });
+      navContainer.appendChild(prevBtn);
     }
     
-    // Check server completion
-    const fingerprint = STATE.deviceFingerprint;
-    if (await checkServerCompletion(fingerprint)) {
-      showDuplicateSubmissionMessage();
-      return;
+    // Next/Submit button
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'nav-button next-button';
+    
+    if (STATE.currentQuestionIndex === STATE.questions.length - 1) {
+      // Last question - show Submit button
+      console.log('  - Showing SUBMIT button');
+      nextBtn.textContent = translations[STATE.currentLanguage].submit || 'Submit';
+      nextBtn.setAttribute('data-button-type', 'submit');
+      nextBtn.setAttribute('data-force-text', 'submit');
+      nextBtn.addEventListener('click', handleSubmitFromNavigation);
+    } else {
+      // Not last question - show Next button
+      console.log('  - Showing NEXT button');
+      nextBtn.textContent = translations[STATE.currentLanguage].nextButton || 'Next';
+      nextBtn.setAttribute('data-button-type', 'next');
+      nextBtn.setAttribute('data-force-text', 'next');
+      nextBtn.addEventListener('click', () => {
+        console.log('🔄 Next button clicked - calling goToNextQuestion()');
+        goToNextQuestion();
+      });
+    }
+    
+    navContainer.appendChild(nextBtn);
+    DOM.navigationButtons.appendChild(navContainer);
+  }
+
+  // Add global debug function for testing
+  window.debugSurveyState = function() {
+    console.log('🔍 Current Survey State:');
+    console.log('  - Current question index:', STATE.currentQuestionIndex);
+    console.log('  - Total questions:', STATE.questions.length);
+    console.log('  - Is last question?', STATE.currentQuestionIndex === STATE.questions.length - 1);
+    console.log('  - Current language:', STATE.currentLanguage);
+    console.log('  - Questions:', STATE.questions);
+    return {
+      currentIndex: STATE.currentQuestionIndex,
+      totalQuestions: STATE.questions.length,
+      isLastQuestion: STATE.currentQuestionIndex === STATE.questions.length - 1,
+      questions: STATE.questions
+    };
+  };
+
+  // Add global function to force navigation re-render
+  window.forceRenderNavigation = function() {
+    console.log('🔄 Force rendering navigation...');
+    renderNavigation();
+    console.log('✅ Navigation re-rendered');
+  };
+
+  // Set up admin authentication token
+  function setupAdminAuth() {
+    // For demo purposes, set a simple admin token
+    // In production, this would come from a proper login system
+    if (!localStorage.getItem('adminToken')) {
+      localStorage.setItem('adminToken', 'demo-admin-token');
     }
   }
+
+  // Call auth setup
+  setupAdminAuth();
+
+  // Protect navigation buttons from translation override
+  function protectNavigationButtons() {
+    const navContainer = document.querySelector('#navigation-buttons');
+    if (!navContainer) return;
+
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+          // Check if we're on the last question and the button text was changed
+          const nextBtn = navContainer.querySelector('.next-button');
+          if (nextBtn && STATE.currentQuestionIndex === STATE.questions.length - 1) {
+            const currentText = nextBtn.textContent.trim();
+            const expectedSubmitText = translations[STATE.currentLanguage].submit || 'Submit';
+            
+            if (currentText !== expectedSubmitText && nextBtn.getAttribute('data-button-type') === 'submit') {
+              console.log('🛡️ Protecting Submit button text from override:', currentText, '→', expectedSubmitText);
+              nextBtn.textContent = expectedSubmitText;
+            }
+          }
+        }
+      });
+    });
+
+    observer.observe(navContainer, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      characterDataOldValue: true
+    });
+
+    console.log('🛡️ Navigation button protection enabled');
+  }
+
+  // Start protection after DOM is ready
+  setTimeout(protectNavigationButtons, 1000);
 
   // Initialize the application
   init();
