@@ -4,13 +4,9 @@ const SubmissionTracker = require('../models/SubmissionTracker');
 
 exports.submitResponse = async (req, res) => {
   try {
-    const { questionId, userId, responseText, selectedOption, deviceFingerprint, submissionTimestamp } = req.body;
+    const { questionId, responseText, selectedOption, deviceFingerprint, submissionTimestamp } = req.body;
     const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
     
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
-    }
-
     // Validate question type and response
     const question = await SurveyQuestion.findById(questionId);
     if (!question) {
@@ -19,7 +15,6 @@ exports.submitResponse = async (req, res) => {
 
     console.log('Submitting response:', {
       questionId,
-      userId,
       questionType: question.questionType,
       responseText,
       selectedOption,
@@ -30,7 +25,6 @@ exports.submitResponse = async (req, res) => {
     // Create response object based on question type
     const responseData = {
       questionId,
-      userId,
       deviceFingerprint,
       submissionTimestamp: submissionTimestamp || new Date(),
       ipAddress: clientIP
@@ -66,7 +60,6 @@ exports.submitResponse = async (req, res) => {
             deviceFingerprint,
             ipAddress: clientIP,
             userAgent: req.get('User-Agent'),
-            employeeId: userId,
             submissionDate: new Date(),
             responseCount: 1,
             lastSubmissionDate: new Date()
@@ -90,8 +83,7 @@ exports.submitResponse = async (req, res) => {
 
 exports.getUserResponses = async (req, res) => {
   try {
-    const { userId } = req.params;
-    const responses = await SurveyResponse.find({ userId })
+    const responses = await SurveyResponse.find()
       .populate('questionId');
     
     console.log('Raw responses from DB:', JSON.stringify(responses, null, 2));
@@ -151,7 +143,6 @@ exports.getAllResponses = async (req, res) => {
       if (!response.questionId) {
         return {
           _id: response._id,
-          userId: response.userId,
           questionId: null,
           questionText: 'Unknown Question',
           questionType: 'text',
@@ -175,7 +166,6 @@ exports.getAllResponses = async (req, res) => {
         questionId: response.questionId._id,
         questionText: response.questionId.text,
         questionType: questionType,
-        userId: response.userId,
         responseText: response.responseText,
         selectedOption: response.selectedOption,
         createdAt: response.createdAt

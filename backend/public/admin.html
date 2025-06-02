@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Employee Sentiment Survey - Admin</title>
+  <title>Employee Survey - Admin</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="tooltip.css">
   <style>
@@ -145,7 +145,7 @@
   </style>
 </head>
 <body>
-    <div class="version-info">v1.1.0</div>
+    <div class="version-info">v1.2.0</div>
   <div class="language-toggle">
     <label for="language-select">Language:</label>
     <select id="language-select">
@@ -156,7 +156,7 @@
 
   <div class="container">
     <header>
-      <h1>Employee Sentiment Survey - Admin Panel</h1>
+      <h1>Employee Survey - Admin Panel</h1>
       <button id="back-to-survey-btn" class="back-to-survey-button">← Back to Survey</button>
     </header>
     
@@ -165,6 +165,7 @@
         <div class="tab active" data-tab="questions">Questions</div>
         <div class="tab" data-tab="responses">User Responses</div>
         <div class="tab" data-tab="analytics">Analytics</div>
+        <div class="tab" data-tab="duplicate-prevention">Duplicate Prevention</div>
       </div>
       
       <!-- Questions Tab -->
@@ -222,6 +223,116 @@
         <p>View response distribution for multiple choice questions</p>
         
         <!-- Question charts will be dynamically added here -->
+      </div>
+      
+      <!-- Duplicate Prevention Tab -->
+      <div class="tab-content" id="duplicate-prevention-tab">
+        <h2>Duplicate Submission Prevention</h2>
+        <p>Manage duplicate submission prevention settings and tracking data</p>
+        
+        <!-- Prevention Settings -->
+        <div class="section">
+          <h3>Prevention Settings</h3>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="enable-duplicate-prevention" checked>
+              Enable Duplicate Submission Prevention
+            </label>
+            <p class="help-text">When enabled, users can only submit the survey once per device within 30 days</p>
+          </div>
+          
+          <div class="form-group">
+            <label for="prevention-duration">Prevention Duration (days):</label>
+            <input type="number" id="prevention-duration" value="30" min="1" max="365">
+            <p class="help-text">How long to prevent duplicate submissions (1-365 days)</p>
+          </div>
+          
+          <button type="button" id="save-prevention-settings" class="btn btn-primary">
+            Save Settings
+          </button>
+        </div>
+        
+        <!-- Tracking Statistics -->
+        <div class="section">
+          <h3>Tracking Statistics</h3>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number" id="total-submissions">-</div>
+              <div class="stat-label">Total Submissions</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="unique-devices">-</div>
+              <div class="stat-label">Unique Devices</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="unique-ips">-</div>
+              <div class="stat-label">Unique IP Addresses</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="recent-submissions">-</div>
+              <div class="stat-label">Last 7 Days</div>
+            </div>
+          </div>
+          
+          <button type="button" id="refresh-stats" class="btn btn-secondary">
+            Refresh Statistics
+          </button>
+        </div>
+        
+        <!-- Data Management -->
+        <div class="section">
+          <h3>Data Management</h3>
+          <div class="warning-box">
+            <h4>⚠️ Warning</h4>
+            <p>These actions will affect duplicate prevention tracking. Use with caution in production.</p>
+          </div>
+          
+          <div class="action-buttons">
+            <button type="button" id="clear-local-storage" class="btn btn-warning">
+              Clear Local Storage (This Device)
+            </button>
+            
+            <button type="button" id="clear-server-tracking" class="btn btn-danger">
+              Clear All Server Tracking Data
+            </button>
+            
+            <button type="button" id="export-tracking-data" class="btn btn-secondary">
+              Export Tracking Data
+            </button>
+          </div>
+          
+          <div class="help-section">
+            <h4>Action Descriptions:</h4>
+            <ul>
+              <li><strong>Clear Local Storage:</strong> Removes completion flags from this browser only</li>
+              <li><strong>Clear Server Tracking:</strong> Removes all device fingerprints and IP tracking from database</li>
+              <li><strong>Export Tracking Data:</strong> Downloads tracking data for analysis or backup</li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- Testing Tools -->
+        <div class="section">
+          <h3>Testing Tools</h3>
+          <div class="testing-tools">
+            <button type="button" id="simulate-duplicate" class="btn btn-info">
+              Simulate Duplicate Submission
+            </button>
+            
+            <button type="button" id="test-fingerprint" class="btn btn-info">
+              Generate Test Fingerprint
+            </button>
+            
+            <button type="button" id="reset-test-state" class="btn btn-secondary">
+              Reset Test State
+            </button>
+          </div>
+          
+          <div class="test-results" id="test-results" style="display: none;">
+            <h4>Test Results:</h4>
+            <pre id="test-output"></pre>
+          </div>
+        </div>
       </div>
     </main>
   </div>

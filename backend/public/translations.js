@@ -2,8 +2,8 @@
 const translations = {
   en: {
     // Common
-    appTitle: "Employee Sentiment Survey",
-    adminTitle: "Employee Sentiment Survey - Admin Panel",
+    appTitle: "Employee Survey",
+    adminTitle: "Employee Survey - Admin Panel",
     submit: "Submit",
     edit: "Edit",
     delete: "Delete",
@@ -92,8 +92,8 @@ const translations = {
   },
   es: {
     // Common
-    appTitle: "Encuesta de Sentimiento de Empleados",
-    adminTitle: "Encuesta de Sentimiento de Empleados - Panel de Administración",
+    appTitle: "Encuesta de Empleado",
+    adminTitle: "Encuesta de Empleado - Panel de Administración",
     submit: "Enviar",
     edit: "Editar",
     delete: "Eliminar",

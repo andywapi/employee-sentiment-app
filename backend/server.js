@@ -192,12 +192,7 @@ app.post('/api/questions/order', async (req, res) => {
   }
 });
 
-// API Routes - Apply authentication middleware to all API routes
-if (process.env.NODE_ENV === 'production') {
-  app.use(API_PREFIX, authenticate);
-} else {
-  console.log('Running in development mode - authentication bypassed');
-}
+// API Routes
 app.use(API_PREFIX, surveyRoutes);
 
 // Serve static frontend

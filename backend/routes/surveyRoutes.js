@@ -4,25 +4,28 @@ const questionController = require('../controllers/questionController');
 const responseController = require('../controllers/responseController');
 const submissionController = require('../controllers/submissionController');
 const axios = require('axios');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // Question Routes
-router.post('/questions/order', questionController.updateQuestionOrder);
-router.post('/questions', questionController.createQuestion);
 router.get('/questions', questionController.getQuestions);
-router.put('/questions/:id', questionController.updateQuestion);
-router.delete('/questions/:id', questionController.deleteQuestion);
+router.post('/questions', authMiddleware, questionController.createQuestion);
+router.put('/questions/:id', authMiddleware, questionController.updateQuestion);
+router.delete('/questions/:id', authMiddleware, questionController.deleteQuestion);
+router.post('/questions/order', authMiddleware, questionController.updateQuestionOrder);
 
 // Response Routes
 router.post('/responses', responseController.submitResponse);
 router.get('/responses/user/:userId', responseController.getUserResponses);
-router.get('/responses', responseController.getAllResponses);
+router.get('/responses', authMiddleware, responseController.getAllResponses);
 router.get('/responses/users', responseController.getUsers);
 router.get('/responses/pareto', responseController.getParetoAnalysis);
 
 // Submission Tracking Routes
 router.post('/check-submission', submissionController.checkSubmission);
 router.post('/record-submission', submissionController.recordSubmission);
-router.get('/submission-stats', submissionController.getSubmissionStats);
+router.get('/submission-stats', authMiddleware, submissionController.getSubmissionStats);
+router.delete('/clear-tracking', authMiddleware, submissionController.clearTrackingData);
+router.get('/export-tracking', authMiddleware, submissionController.exportTrackingData);
 
 // Weather proxy route to avoid CORS issues
 router.get('/weather', async (req, res) => {

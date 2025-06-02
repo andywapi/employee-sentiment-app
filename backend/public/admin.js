@@ -69,9 +69,15 @@ function getAuthHeaders() {
     'Content-Type': 'application/json'
   };
   
-  // Add auth header if credentials exist
+  // Add admin token for protected routes
+  const adminToken = localStorage.getItem('adminToken');
+  if (adminToken) {
+    headers['Authorization'] = `Bearer ${adminToken}`;
+  }
+  
+  // Fallback to basic auth credentials if available
   const credentials = localStorage.getItem('auth_credentials');
-  if (credentials) {
+  if (credentials && !adminToken) {
     headers['Authorization'] = `Basic ${credentials}`;
   }
   
@@ -1336,10 +1342,12 @@ async function getWeatherData() {
   } catch (error) {
     console.error('Error fetching weather data:', error);
     // Show a fallback message
-    DOM.weatherDisplay.innerHTML = `
-      <span class="icon">🌡️</span>
-      <span class="temp">Weather unavailable</span>
-    `;
+    if (DOM.weatherDisplay) {
+      DOM.weatherDisplay.innerHTML = `
+        <span class="icon">🌡️</span>
+        <span class="temp">Weather unavailable</span>
+      `;
+    }
   }
 }
 
@@ -1349,28 +1357,22 @@ async function getWeatherData() {
 function updateWeatherDisplay() {
   if (!STATE.weatherData) return;
   
-  // Get weather icon based on condition
-  let weatherIcon = '🌡️'; // Default icon
-  const condition = STATE.weatherData.condition.toLowerCase();
-  
-  if (condition.includes('sun') || condition.includes('clear')) {
-    weatherIcon = '☀️';
-  } else if (condition.includes('cloud')) {
-    weatherIcon = '☁️';
-  } else if (condition.includes('rain') || condition.includes('drizzle')) {
-    weatherIcon = '🌧️';
-  } else if (condition.includes('snow')) {
-    weatherIcon = '❄️';
-  } else if (condition.includes('thunder') || condition.includes('storm')) {
-    weatherIcon = '⛈️';
-  } else if (condition.includes('fog') || condition.includes('mist')) {
-    weatherIcon = '🌫️';
+  // Check if weather display element exists (it might not exist in admin panel)
+  if (!DOM.weatherDisplay) {
+    console.log('Weather display element not found in admin panel');
+    return;
   }
   
-  // Get temperature in the current unit
-  const temperature = STATE.temperatureUnit === 'C' 
-    ? STATE.weatherData.temperature_C 
-    : STATE.weatherData.temperature_F;
+  const temp = STATE.weatherData.temperature_C;
+  let temperature;
+  
+  if (STATE.temperatureUnit === 'F') {
+    temperature = Math.round((temp * 9/5) + 32);
+  } else {
+    temperature = Math.round(temp);
+  }
+  
+  const weatherIcon = getWeatherIcon(STATE.weatherData.condition);
   
   // Update the DOM
   DOM.weatherDisplay.innerHTML = `
@@ -1382,9 +1384,6 @@ function updateWeatherDisplay() {
   DOM.weatherDisplay.title = STATE.currentLanguage === 'en' 
     ? 'Click to toggle between °C and °F' 
     : 'Haga clic para cambiar entre °C y °F';
-  
-  // Add cursor style to indicate it's clickable
-  DOM.weatherDisplay.style.cursor = 'pointer';
 }
 
 /**
@@ -2077,6 +2076,412 @@ function showError(message) {
     errorMessage.remove();
   }, 5000);
 }
+
+/**
+ * Show a message to the user
+ * @param {string} message - The message to show
+ * @param {string} type - The type of message ('success', 'error', 'info')
+ */
+function showMessage(message, type = 'info') {
+  // Create or get existing message container
+  let messageContainer = document.getElementById('message-container');
+  
+  if (!messageContainer) {
+    // Create a new message container
+    messageContainer = document.createElement('div');
+    messageContainer.id = 'message-container';
+    messageContainer.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      max-width: 400px;
+    `;
+    document.body.appendChild(messageContainer);
+  }
+  
+  // Create message element
+  const messageElement = document.createElement('div');
+  messageElement.style.cssText = `
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease-out;
+    background-color: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'};
+  `;
+  messageElement.textContent = message;
+  
+  // Add animation styles if not already added
+  if (!document.getElementById('message-styles')) {
+    const styles = document.createElement('style');
+    styles.id = 'message-styles';
+    styles.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(styles);
+  }
+
+  messageContainer.appendChild(messageElement);
+
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    messageElement.style.animation = 'slideOut 0.3s ease-in';
+    setTimeout(() => {
+      if (messageElement.parentNode) {
+        messageElement.parentNode.removeChild(messageElement);
+      }
+    }, 300);
+  }, 5000);
+}
+
+// Duplicate Prevention Management
+class DuplicatePreventionManager {
+  constructor() {
+    this.initializeDuplicatePreventionTab();
+  }
+
+  initializeDuplicatePreventionTab() {
+    // Initialize event listeners when the duplicate prevention tab is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      this.setupEventListeners();
+      this.loadPreventionSettings();
+      this.loadStatistics();
+    });
+  }
+
+  setupEventListeners() {
+    // Save prevention settings
+    const saveSettingsBtn = document.getElementById('save-prevention-settings');
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener('click', () => this.savePreventionSettings());
+    }
+
+    // Refresh statistics
+    const refreshStatsBtn = document.getElementById('refresh-stats');
+    if (refreshStatsBtn) {
+      refreshStatsBtn.addEventListener('click', () => this.loadStatistics());
+    }
+
+    // Clear local storage
+    const clearLocalBtn = document.getElementById('clear-local-storage');
+    if (clearLocalBtn) {
+      clearLocalBtn.addEventListener('click', () => this.clearLocalStorage());
+    }
+
+    // Clear server tracking
+    const clearServerBtn = document.getElementById('clear-server-tracking');
+    if (clearServerBtn) {
+      clearServerBtn.addEventListener('click', () => this.clearServerTracking());
+    }
+
+    // Export tracking data
+    const exportBtn = document.getElementById('export-tracking-data');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportTrackingData());
+    }
+
+    // Testing tools
+    const simulateBtn = document.getElementById('simulate-duplicate');
+    if (simulateBtn) {
+      simulateBtn.addEventListener('click', () => this.simulateDuplicate());
+    }
+
+    const testFingerprintBtn = document.getElementById('test-fingerprint');
+    if (testFingerprintBtn) {
+      testFingerprintBtn.addEventListener('click', () => this.testFingerprint());
+    }
+
+    const resetTestBtn = document.getElementById('reset-test-state');
+    if (resetTestBtn) {
+      resetTestBtn.addEventListener('click', () => this.resetTestState());
+    }
+  }
+
+  async loadPreventionSettings() {
+    try {
+      // Load settings from localStorage or server
+      const enabled = localStorage.getItem('duplicatePreventionEnabled') === 'true';
+      const duration = localStorage.getItem('duplicatePreventionDuration') || '30';
+
+      const enableCheckbox = document.getElementById('enable-duplicate-prevention');
+      const durationInput = document.getElementById('prevention-duration');
+
+      if (enableCheckbox) enableCheckbox.checked = enabled;
+      if (durationInput) durationInput.value = duration;
+    } catch (error) {
+      console.error('Error loading prevention settings:', error);
+    }
+  }
+
+  async savePreventionSettings() {
+    try {
+      const enableCheckbox = document.getElementById('enable-duplicate-prevention');
+      const durationInput = document.getElementById('prevention-duration');
+
+      const enabled = enableCheckbox?.checked || false;
+      const duration = durationInput?.value || '30';
+
+      // Save to localStorage (in a real app, this would be saved to server)
+      localStorage.setItem('duplicatePreventionEnabled', enabled.toString());
+      localStorage.setItem('duplicatePreventionDuration', duration);
+
+      // If duplicate prevention is disabled, clear existing duplicate flags
+      if (!enabled) {
+        console.log('Duplicate prevention disabled - clearing existing flags');
+        
+        // Clear local storage flags
+        localStorage.removeItem('survey_completed');
+        localStorage.removeItem('survey_completion_date');
+        
+        // Optionally clear server tracking data as well
+        try {
+          const response = await fetch('/api/clear-tracking', {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+          });
+          
+          if (response.ok) {
+            console.log('Server tracking data cleared');
+          } else {
+            console.warn('Failed to clear server tracking data:', response.status);
+          }
+        } catch (error) {
+          console.warn('Error clearing server tracking data:', error);
+        }
+        
+        showMessage('Duplicate prevention disabled and existing flags cleared!', 'success');
+      } else {
+        showMessage('Prevention settings saved successfully!', 'success');
+      }
+      
+      // Refresh statistics to reflect changes
+      await this.loadStatistics();
+    } catch (error) {
+      console.error('Error saving prevention settings:', error);
+      showMessage('Error saving prevention settings', 'error');
+    }
+  }
+
+  async loadStatistics() {
+    try {
+      const response = await fetch('/api/submission-stats', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+
+      if (response.ok) {
+        const stats = await response.json();
+        this.updateStatisticsDisplay(stats);
+      } else {
+        // Fallback to mock data if endpoint not available
+        this.updateStatisticsDisplay({
+          totalSubmissions: 0,
+          uniqueDevices: 0,
+          uniqueIPs: 0,
+          recentSubmissions: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading statistics:', error);
+      // Show mock data
+      this.updateStatisticsDisplay({
+        totalSubmissions: 0,
+        uniqueDevices: 0,
+        uniqueIPs: 0,
+        recentSubmissions: 0
+      });
+    }
+  }
+
+  updateStatisticsDisplay(stats) {
+    const elements = {
+      'total-submissions': stats.totalSubmissions || 0,
+      'unique-devices': stats.uniqueDevices || 0,
+      'unique-ips': stats.uniqueIPs || 0,
+      'recent-submissions': stats.recentSubmissions || 0
+    };
+
+    Object.entries(elements).forEach(([id, value]) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = value.toLocaleString();
+      }
+    });
+  }
+
+  clearLocalStorage() {
+    if (confirm('Are you sure you want to clear local storage for this device? This will remove the survey completion flag.')) {
+      try {
+        // Clear survey-related localStorage items
+        localStorage.removeItem('surveyCompleted');
+        localStorage.removeItem('surveyCompletedAt');
+        localStorage.removeItem('deviceFingerprint');
+        
+        showMessage('Local storage cleared successfully!', 'success');
+      } catch (error) {
+        console.error('Error clearing local storage:', error);
+        showMessage('Error clearing local storage', 'error');
+      }
+    }
+  }
+
+  async clearServerTracking() {
+    if (confirm('Are you sure you want to clear ALL server tracking data? This will remove all device fingerprints and IP tracking records from the database. This action cannot be undone.')) {
+      try {
+        const response = await fetch('/api/clear-tracking', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          showMessage('Server tracking data cleared successfully!', 'success');
+          this.loadStatistics(); // Refresh stats
+        } else {
+          showMessage('Error clearing server tracking data', 'error');
+        }
+      } catch (error) {
+        console.error('Error clearing server tracking:', error);
+        showMessage('Error clearing server tracking data', 'error');
+      }
+    }
+  }
+
+  async exportTrackingData() {
+    try {
+      const response = await fetch('/api/export-tracking', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tracking-data-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showMessage('Tracking data exported successfully!', 'success');
+      } else {
+        showMessage('Error exporting tracking data', 'error');
+      }
+    } catch (error) {
+      console.error('Error exporting tracking data:', error);
+      showMessage('Error exporting tracking data', 'error');
+    }
+  }
+
+  simulateDuplicate() {
+    try {
+      // Set localStorage to simulate a completed survey
+      const now = new Date().toISOString();
+      localStorage.setItem('survey_completed', 'true');
+      localStorage.setItem('survey_completion_date', now);
+      
+      this.showTestResult('Duplicate submission state simulated. LocalStorage flags set.');
+      showMessage('Duplicate submission simulated. Try accessing the survey to test.', 'success');
+    } catch (error) {
+      console.error('Error simulating duplicate:', error);
+      showMessage('Error simulating duplicate submission', 'error');
+    }
+  }
+
+  testFingerprint() {
+    try {
+      // Generate a test device fingerprint
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('Device fingerprint test', 2, 2);
+      
+      const fingerprint = canvas.toDataURL().slice(-64);
+      const deviceInfo = {
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        platform: navigator.platform,
+        screenResolution: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        fingerprint: fingerprint
+      };
+      
+      this.showTestResult(JSON.stringify(deviceInfo, null, 2));
+    } catch (error) {
+      console.error('Error generating test fingerprint:', error);
+      showMessage('Error generating test fingerprint', 'error');
+    }
+  }
+
+  resetTestState() {
+    if (confirm('Reset all test states? This will clear localStorage and refresh statistics.')) {
+      try {
+        // Clear test-related localStorage
+        localStorage.removeItem('survey_completed');
+        localStorage.removeItem('survey_completion_date');
+        localStorage.removeItem('deviceFingerprint');
+        
+        // Hide test results
+        const testResults = document.getElementById('test-results');
+        if (testResults) {
+          testResults.style.display = 'none';
+        }
+        
+        // Refresh statistics
+        this.loadStatistics();
+        
+        showMessage('Test state reset successfully!', 'success');
+      } catch (error) {
+        console.error('Error resetting test state:', error);
+        showMessage('Error resetting test state', 'error');
+      }
+    }
+  }
+
+  showTestResult(result) {
+    const testResults = document.getElementById('test-results');
+    const testOutput = document.getElementById('test-output');
+    
+    if (testResults && testOutput) {
+      testOutput.textContent = result;
+      testResults.style.display = 'block';
+    }
+  }
+}
+
+// Initialize duplicate prevention manager
+const duplicatePreventionManager = new DuplicatePreventionManager();
+
+// Set up admin authentication token
+function setupAdminAuth() {
+  // For demo purposes, set a simple admin token
+  // In production, this would come from a proper login system
+  if (!localStorage.getItem('adminToken')) {
+    localStorage.setItem('adminToken', 'demo-admin-token');
+  }
+}
+
+// Call auth setup
+setupAdminAuth();
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', init);

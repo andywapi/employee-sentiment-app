@@ -152,8 +152,82 @@ const getSubmissionStats = async (req, res) => {
   }
 };
 
+// Clear all tracking data
+const clearTrackingData = async (req, res) => {
+  try {
+    // Clear all submission tracker records
+    await SubmissionTracker.deleteMany({});
+    
+    // Optionally clear device fingerprints from survey responses
+    await SurveyResponse.updateMany(
+      {},
+      { 
+        $unset: { 
+          deviceFingerprint: 1, 
+          ipAddress: 1 
+        } 
+      }
+    );
+    
+    res.json({ 
+      message: 'All tracking data cleared successfully',
+      clearedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error clearing tracking data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Export tracking data
+const exportTrackingData = async (req, res) => {
+  try {
+    // Get all submission tracker records
+    const trackingData = await SubmissionTracker.find({})
+      .select('-__v')
+      .sort({ createdAt: -1 });
+    
+    // Get submission statistics
+    const stats = await getSubmissionStatsData();
+    
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      statistics: stats,
+      trackingRecords: trackingData,
+      totalRecords: trackingData.length
+    };
+    
+    res.json(exportData);
+  } catch (error) {
+    console.error('Error exporting tracking data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Helper function to get stats data (reusable)
+const getSubmissionStatsData = async () => {
+  const totalSubmissions = await SubmissionTracker.countDocuments();
+  const uniqueDevices = await SubmissionTracker.distinct('deviceFingerprint').then(arr => arr.length);
+  const uniqueIPs = await SubmissionTracker.distinct('ipAddress').then(arr => arr.length);
+  
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const recentSubmissions = await SubmissionTracker.countDocuments({
+    createdAt: { $gte: sevenDaysAgo }
+  });
+  
+  return {
+    totalSubmissions,
+    uniqueDevices,
+    uniqueIPs,
+    recentSubmissions
+  };
+};
+
 module.exports = {
   checkSubmission,
   recordSubmission,
-  getSubmissionStats
+  getSubmissionStats,
+  clearTrackingData,
+  exportTrackingData
 };

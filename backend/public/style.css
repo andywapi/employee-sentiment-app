@@ -1205,3 +1205,190 @@ input[type="checkbox"]:checked::before {
 .duplicate-actions .admin-link:hover {
   background-color: #0062cc;
 }
+
+/* Duplicate Prevention Tab Styles */
+.section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.section h3 {
+  margin: 0 0 1rem 0;
+  color: #1d1d1f;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #007aff;
+}
+
+.help-text {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #007aff;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.warning-box {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.warning-box h4 {
+  margin: 0 0 0.5rem 0;
+  color: #856404;
+  font-size: 1rem;
+}
+
+.warning-box p {
+  margin: 0;
+  color: #856404;
+  font-size: 0.875rem;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.help-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.help-section h4 {
+  margin: 0 0 0.75rem 0;
+  color: #1d1d1f;
+  font-size: 1rem;
+}
+
+.help-section ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.help-section li {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.testing-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.test-results {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.test-results h4 {
+  margin: 0 0 0.75rem 0;
+  color: #1d1d1f;
+  font-size: 1rem;
+}
+
+.test-results pre {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  margin: 0;
+}
+
+/* Button variants for duplicate prevention */
+.btn.btn-warning {
+  background: #ff9500;
+  color: white;
+}
+
+.btn.btn-warning:hover {
+  background: #e6850e;
+}
+
+.btn.btn-danger {
+  background: #ff3b30;
+  color: white;
+}
+
+.btn.btn-danger:hover {
+  background: #e6342a;
+}
+
+.btn.btn-info {
+  background: #007aff;
+  color: white;
+}
+
+.btn.btn-info:hover {
+  background: #0056cc;
+}
+
+.btn.btn-secondary {
+  background: #8e8e93;
+  color: white;
+}
+
+.btn.btn-secondary:hover {
+  background: #6d6d70;
+}
